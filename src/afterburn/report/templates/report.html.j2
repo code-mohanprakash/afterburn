@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Afterburn Diagnostic Report</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>{{ styles }}</style>
+</head>
+<body>
+    <header>
+        <h1><span class="brand">Afterburn</span> Diagnostic Report</h1>
+        <div class="model-info">
+            <div>
+                <div class="label">Base Model</div>
+                <div class="value">{{ report.model_pair.base_model }}</div>
+            </div>
+            <div>
+                <div class="label">Trained Model</div>
+                <div class="value">{{ report.model_pair.trained_model }}</div>
+            </div>
+            <div>
+                <div class="label">Method</div>
+                <div class="value">{{ report.model_pair.method.value | upper }}</div>
+            </div>
+            <div>
+                <div class="label">Generated</div>
+                <div class="value">{{ timestamp }}</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Executive Summary -->
+    <section id="executive-summary">
+        <h2>Executive Summary</h2>
+        {% if report.reward_hack %}
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <span class="risk-badge risk-{{ report.reward_hack.risk_level.value }}">
+                {{ report.reward_hack.risk_level.value | upper }} RISK
+            </span>
+            <span class="mono" style="font-size: 1.2rem;">
+                {{ report.hack_score | round(0) }}/100
+            </span>
+        </div>
+        {% endif %}
+        <p class="summary-text">{{ report.summary }}</p>
+    </section>
+
+    {% if report.weight_diff %}
+    <!-- Weight Diff Analysis -->
+    <section id="weight-diff">
+        <h2>Weight Diff Analysis</h2>
+
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ "{:,}".format(report.weight_diff.total_param_count) }}</div>
+                <div class="stat-label">Total Parameters</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "{:,}".format(report.weight_diff.changed_param_count) }}</div>
+                <div class="stat-label">Changed Parameters</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.1f" | format(report.weight_diff.change_concentration * 100) }}%</div>
+                <div class="stat-label">Change Concentration (Top 5)</div>
+            </div>
+        </div>
+
+        <h3>Layer Weight Differences</h3>
+        <div class="chart">{{ layer_heatmap }}</div>
+
+        <h3>Top Changed Layers</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Layer</th>
+                    <th>L2 Norm</th>
+                    <th>Cosine Sim</th>
+                    <th>Frobenius</th>
+                    <th>Relative Change</th>
+                    <th>Params</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for layer in report.weight_diff.top_changed_layers %}
+                <tr>
+                    <td class="mono">{{ layer.layer_name }}</td>
+                    <td class="mono">{{ "%.4f" | format(layer.l2_norm) }}</td>
+                    <td class="mono">{{ "%.6f" | format(layer.cosine_similarity) }}</td>
+                    <td class="mono">{{ "%.4f" | format(layer.frobenius_norm) }}</td>
+                    <td class="mono">{{ "%.6f" | format(layer.relative_change) }}</td>
+                    <td class="mono">{{ "{:,}".format(layer.param_count) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if attention_chart %}
+        <h3>Attention Head Changes</h3>
+        <div class="chart">{{ attention_chart }}</div>
+        {% endif %}
+
+        {% if report.weight_diff.layernorm_shifts %}
+        <h3>LayerNorm Shifts</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Layer</th>
+                    <th>Gamma Shift</th>
+                    <th>Beta Shift</th>
+                    <th>Total Shift</th>
+                    <th>Significant</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for shift in report.weight_diff.layernorm_shifts %}
+                <tr>
+                    <td class="mono">{{ shift.layer_name }}</td>
+                    <td class="mono">{{ "%.6f" | format(shift.gamma_shift) }}</td>
+                    <td class="mono">{{ "%.6f" | format(shift.beta_shift) }}</td>
+                    <td class="mono">{{ "%.6f" | format(shift.total_shift) }}</td>
+                    <td>{% if shift.is_significant %}⚠ Yes{% else %}No{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <h3>Embedding Drift</h3>
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.4f" | format(report.weight_diff.embedding_drift.input_embedding_l2) }}</div>
+                <div class="stat-label">Input Embedding L2</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.6f" | format(report.weight_diff.embedding_drift.input_embedding_cosine) }}</div>
+                <div class="stat-label">Input Embedding Cosine</div>
+            </div>
+            {% if report.weight_diff.embedding_drift.output_embedding_l2 is not none %}
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.4f" | format(report.weight_diff.embedding_drift.output_embedding_l2) }}</div>
+                <div class="stat-label">Output Embedding L2</div>
+            </div>
+            {% endif %}
+        </div>
+        {% if embedding_chart %}
+        <div class="chart">{{ embedding_chart | safe }}</div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if report.behaviour %}
+    <!-- Behavioural Analysis -->
+    <section id="behaviour">
+        <h2>Behavioural Analysis</h2>
+
+        <h3>Output Length Distribution</h3>
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.1f" | format(report.behaviour.length_analysis.base_mean) }}</div>
+                <div class="stat-label">Base Mean Length</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.1f" | format(report.behaviour.length_analysis.trained_mean) }}</div>
+                <div class="stat-label">Trained Mean Length</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.2f" | format(report.behaviour.length_analysis.cohens_d) }}</div>
+                <div class="stat-label">Cohen's d</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.4f" | format(report.behaviour.length_analysis.p_value) }}</div>
+                <div class="stat-label">p-value</div>
+            </div>
+        </div>
+        {% if length_chart %}
+        <div class="chart">{{ length_chart }}</div>
+        {% endif %}
+
+        {% if category_length_chart %}
+        <h3>Per-Category Length Analysis</h3>
+        <div class="chart">{{ category_length_chart | safe }}</div>
+        {% endif %}
+
+        {% if strategy_chart %}
+        <h3>Reasoning Strategy Shift</h3>
+        <div class="chart">{{ strategy_chart }}</div>
+        {% if report.behaviour.strategy_analysis.dominant_shift %}
+        <p class="summary-text">
+            Dominant shift: <strong>{{ report.behaviour.strategy_analysis.dominant_shift }}</strong>
+            (Entropy: {{ "%.2f" | format(report.behaviour.strategy_analysis.base_entropy) }}
+            → {{ "%.2f" | format(report.behaviour.strategy_analysis.trained_entropy) }})
+        </p>
+        {% endif %}
+        {% endif %}
+
+        {% if cot_chart %}
+        <h3>Chain-of-Thought Depth Distribution</h3>
+        <div class="chart">{{ cot_chart | safe }}</div>
+        {% endif %}
+
+        <h3>Chain-of-Thought Analysis</h3>
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.1f" | format(report.behaviour.cot_analysis.base_avg_steps) }}</div>
+                <div class="stat-label">Base Avg Steps</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.1f" | format(report.behaviour.cot_analysis.trained_avg_steps) }}</div>
+                <div class="stat-label">Trained Avg Steps</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%+.1f" | format(report.behaviour.cot_analysis.step_count_change) }}</div>
+                <div class="stat-label">Step Count Change</div>
+            </div>
+        </div>
+
+        {% if calibration_chart %}
+        <h3>Calibration Analysis</h3>
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.4f" | format(report.behaviour.calibration.base_ece) }}</div>
+                <div class="stat-label">Base ECE</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.4f" | format(report.behaviour.calibration.trained_ece) }}</div>
+                <div class="stat-label">Trained ECE</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%+.4f" | format(report.behaviour.calibration.calibration_change) }}</div>
+                <div class="stat-label">Calibration Change</div>
+            </div>
+        </div>
+        <div class="chart">{{ calibration_chart | safe }}</div>
+        {% endif %}
+
+        {% if format_radar %}
+        <h3>Format Pattern Detection</h3>
+        <div class="chart">{{ format_radar | safe }}</div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if report.reward_hack %}
+    <!-- Reward Hacking Assessment -->
+    <section id="reward-hacking">
+        <h2>Reward Hacking Assessment</h2>
+
+        {% if risk_gauge %}
+        <div class="chart" style="max-width: 400px; margin: 0 auto;">{{ risk_gauge }}</div>
+        {% endif %}
+
+        {% if hack_breakdown %}
+        <div class="chart">{{ hack_breakdown }}</div>
+        {% endif %}
+
+        {% if report.reward_hack.flags %}
+        <h3>Flags</h3>
+        {% for flag in report.reward_hack.flags %}
+        <div class="flag-item">{{ flag }}</div>
+        {% endfor %}
+        {% endif %}
+
+        <h3>Detailed Scores</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Check</th>
+                    <th>Score</th>
+                    <th>Flagged</th>
+                    <th>Detail</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Length Bias</td>
+                    <td class="mono">{{ "%.1f" | format(report.reward_hack.length_bias.score) }}</td>
+                    <td>{% if report.reward_hack.length_bias.is_flagged %}⚠ Yes{% else %}No{% endif %}</td>
+                    <td>{{ report.reward_hack.length_bias.detail }}</td>
+                </tr>
+                <tr>
+                    <td>Format Gaming</td>
+                    <td class="mono">{{ "%.1f" | format(report.reward_hack.format_gaming.score) }}</td>
+                    <td>{% if report.reward_hack.format_gaming.is_flagged %}⚠ Yes{% else %}No{% endif %}</td>
+                    <td>{{ report.reward_hack.format_gaming.detail }}</td>
+                </tr>
+                <tr>
+                    <td>Strategy Collapse</td>
+                    <td class="mono">{{ "%.1f" | format(report.reward_hack.strategy_collapse.score) }}</td>
+                    <td>{% if report.reward_hack.strategy_collapse.is_flagged %}⚠ Yes{% else %}No{% endif %}</td>
+                    <td>{{ report.reward_hack.strategy_collapse.detail }}</td>
+                </tr>
+                <tr>
+                    <td>Sycophancy</td>
+                    <td class="mono">{{ "%.1f" | format(report.reward_hack.sycophancy.score) }}</td>
+                    <td>{% if report.reward_hack.sycophancy.is_flagged %}⚠ Yes{% else %}No{% endif %}</td>
+                    <td>{{ report.reward_hack.sycophancy.detail }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        {% if sycophancy_chart %}
+        <h3>Sycophancy Analysis</h3>
+        <div class="chart">{{ sycophancy_chart | safe }}</div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    <!-- Recommendations -->
+    {% if report.recommendations %}
+    <section id="recommendations">
+        <h2>Recommendations</h2>
+        {% for rec in report.recommendations %}
+        <div class="recommendation">{{ rec }}</div>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    <footer>
+        Generated by <a href="https://github.com/afterburn-llm/afterburn">Afterburn</a> v{{ version }}
+        — Post-training diagnostics for LLMs
+    </footer>
+</body>
+</html>

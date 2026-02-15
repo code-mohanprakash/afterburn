@@ -1,0 +1,94 @@
+name: "math-reasoning"
+version: "1.0"
+description: "Math reasoning prompts covering arithmetic, algebra, and word problems"
+category: "math"
+prompts:
+  - id: "math_001"
+    text: "What is 15% of 240?"
+    expected_answer: "36"
+    difficulty: "easy"
+    tags: ["arithmetic", "percentage"]
+
+  - id: "math_002"
+    text: "Solve for x: 3x + 7 = 22"
+    expected_answer: "5"
+    difficulty: "easy"
+    tags: ["algebra", "linear-equation"]
+
+  - id: "math_003"
+    text: "A train travels at 60 mph for 2.5 hours. How far does it travel?"
+    expected_answer: "150 miles"
+    difficulty: "easy"
+    tags: ["arithmetic", "word-problem"]
+
+  - id: "math_004"
+    text: "What is the sum of the first 10 positive integers?"
+    expected_answer: "55"
+    difficulty: "easy"
+    tags: ["arithmetic", "series"]
+
+  - id: "math_005"
+    text: "If a rectangle has a length of 8 cm and a width of 5 cm, what is its area?"
+    expected_answer: "40 square centimeters"
+    difficulty: "easy"
+    tags: ["geometry", "area"]
+
+  - id: "math_006"
+    text: "Simplify: (2x^2 + 3x - 5) + (x^2 - 2x + 1)"
+    expected_answer: "3x^2 + x - 4"
+    difficulty: "medium"
+    tags: ["algebra", "simplification"]
+
+  - id: "math_007"
+    text: "A store offers a 20% discount on a $80 item, then charges 8% tax on the discounted price. What is the final price?"
+    expected_answer: "$69.12"
+    difficulty: "medium"
+    tags: ["arithmetic", "multi-step"]
+
+  - id: "math_008"
+    text: "How many ways can you arrange the letters in the word MATH?"
+    expected_answer: "24"
+    difficulty: "medium"
+    tags: ["combinatorics", "permutation"]
+
+  - id: "math_009"
+    text: "Find the derivative of f(x) = 3x^3 - 2x^2 + x - 7"
+    expected_answer: "9x^2 - 4x + 1"
+    difficulty: "medium"
+    tags: ["calculus", "derivative"]
+
+  - id: "math_010"
+    text: "A bag contains 5 red balls and 3 blue balls. If you draw 2 balls without replacement, what is the probability that both are red?"
+    expected_answer: "5/14"
+    difficulty: "medium"
+    tags: ["probability"]
+
+  - id: "math_011"
+    text: "Solve the system of equations: 2x + y = 7 and x - y = 2"
+    expected_answer: "x = 3, y = 1"
+    difficulty: "medium"
+    tags: ["algebra", "system-of-equations"]
+
+  - id: "math_012"
+    text: "What is the value of log base 2 of 64?"
+    expected_answer: "6"
+    difficulty: "medium"
+    tags: ["logarithm"]
+
+  - id: "math_013"
+    text: "A car depreciates by 15% each year. If it was worth $25,000 new, what is it worth after 3 years? Round to the nearest dollar."
+    expected_answer: "$15,353"
+    difficulty: "hard"
+    tags: ["exponential", "depreciation"]
+
+  - id: "math_014"
+    text: "Find all real solutions to x^3 - 6x^2 + 11x - 6 = 0"
+    expected_answer: "x = 1, 2, 3"
+    difficulty: "hard"
+    tags: ["algebra", "polynomial"]
+
+  - id: "math_015"
+    text: "Evaluate the integral of sin(x) * cos(x) dx"
+    expected_answer: "sin^2(x)/2 + C"
+    difficulty: "hard"
+    tags: ["calculus", "integration"]

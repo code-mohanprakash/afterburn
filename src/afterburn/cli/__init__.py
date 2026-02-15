@@ -1,0 +1,1 @@
+"""Afterburn CLI module."""

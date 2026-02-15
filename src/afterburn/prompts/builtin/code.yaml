@@ -1,0 +1,65 @@
+name: "code-generation"
+version: "1.0"
+description: "Code generation and debugging prompts across multiple languages"
+category: "code"
+prompts:
+  - id: "code_001"
+    text: "Write a Python function that checks if a string is a palindrome."
+    difficulty: "easy"
+    tags: ["python", "string"]
+
+  - id: "code_002"
+    text: "Write a function to find the maximum element in a list without using the built-in max() function."
+    difficulty: "easy"
+    tags: ["python", "array"]
+
+  - id: "code_003"
+    text: "Implement a function that reverses a linked list in-place."
+    difficulty: "medium"
+    tags: ["data-structure", "linked-list"]
+
+  - id: "code_004"
+    text: "Write a Python function that finds all prime numbers up to n using the Sieve of Eratosthenes."
+    difficulty: "medium"
+    tags: ["python", "algorithm"]
+
+  - id: "code_005"
+    text: "Implement binary search on a sorted array. Return the index of the target, or -1 if not found."
+    difficulty: "easy"
+    tags: ["algorithm", "search"]
+
+  - id: "code_006"
+    text: "Write a function to check if two strings are anagrams of each other."
+    difficulty: "easy"
+    tags: ["python", "string"]
+
+  - id: "code_007"
+    text: "Implement a basic stack data structure with push, pop, peek, and is_empty operations."
+    difficulty: "easy"
+    tags: ["data-structure", "stack"]
+
+  - id: "code_008"
+    text: "Write a function that finds the longest common subsequence of two strings."
+    difficulty: "hard"
+    tags: ["algorithm", "dynamic-programming"]
+
+  - id: "code_009"
+    text: "Debug this code and explain the fix:\ndef fibonacci(n):\n    if n == 0: return 0\n    if n == 1: return 1\n    return fibonacci(n) + fibonacci(n-1)"
+    expected_answer: "The recursive call should be fibonacci(n-1) + fibonacci(n-2)"
+    difficulty: "easy"
+    tags: ["debugging", "recursion"]
+
+  - id: "code_010"
+    text: "Write a Python function that flattens a nested list of arbitrary depth. For example, [1, [2, [3, 4], 5], 6] should become [1, 2, 3, 4, 5, 6]."
+    difficulty: "medium"
+    tags: ["python", "recursion"]
+
+  - id: "code_011"
+    text: "Implement merge sort for a list of integers."
+    difficulty: "medium"
+    tags: ["algorithm", "sorting"]
+
+  - id: "code_012"
+    text: "Write a function that validates if a string contains balanced parentheses, including (), [], and {}."
+    difficulty: "medium"
+    tags: ["python", "stack"]

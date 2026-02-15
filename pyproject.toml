@@ -1,0 +1,79 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "afterburn"
+version = "0.2.0"
+description = "Post-training diagnostics for LLMs — what did fine-tuning actually do to your model?"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Mo", email = "mo@afterburn.dev" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=2.0",
+    "transformers>=4.35",
+    "safetensors>=0.4",
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "click>=8.1",
+    "rich>=13.0",
+    "pyyaml>=6.0",
+    "jinja2>=3.1",
+    "plotly>=5.18",
+    "huggingface-hub>=0.19",
+]
+
+[project.optional-dependencies]
+pdf = ["weasyprint>=60"]
+dev = [
+    "afterburn[pdf]",
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "hypothesis>=6.90",
+    "ruff>=0.1",
+    "mypy>=1.7",
+]
+
+[project.scripts]
+afterburn = "afterburn.cli.main:cli"
+
+[project.urls]
+Homepage = "https://github.com/afterburn-llm/afterburn"
+Documentation = "https://afterburn.dev"
+Repository = "https://github.com/afterburn-llm/afterburn"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/afterburn"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (requiring model downloads)",
+    "gpu: marks tests requiring GPU",
+]
