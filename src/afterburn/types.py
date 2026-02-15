@@ -67,6 +67,15 @@ class LayerDiff:
     frobenius_norm: float
     relative_change: float
     param_count: int
+    # SVD analysis of weight diff (None for 1D/bias layers)
+    svd_top_singular_values: tuple[float, ...] | None = None
+    svd_effective_rank: int | None = None
+    svd_concentration_ratio: float | None = None
+    svd_stable_rank: float | None = None
+    # Spectral analysis of the trained weight matrix
+    spectral_alpha: float | None = None
+    spectral_alpha_quality: str | None = None
+    spectral_stable_rank: float | None = None
 
 
 @dataclass(frozen=True)
@@ -309,6 +318,33 @@ class WeightDiffResult:
 
 
 @dataclass
+class TokenDivergenceAnalysis:
+    """Token-level probability divergence between base and trained models."""
+
+    mean_kl_divergence: float = 0.0
+    per_prompt_kl: list[float] = field(default_factory=list)
+    top_divergent_prompts: list[tuple[str, float]] = field(default_factory=list)
+    per_category: dict[str, float] = field(default_factory=dict)
+    has_token_probs: bool = False
+    num_prompts_analyzed: int = 0
+
+
+@dataclass
+class DiversityAnalysis:
+    """Output diversity comparison using EAD and optional SBERT semantic similarity."""
+
+    base_ead: dict[int, float] = field(default_factory=dict)
+    trained_ead: dict[int, float] = field(default_factory=dict)
+    base_diversity_score: float = 0.0
+    trained_diversity_score: float = 0.0
+    diversity_change: float = 0.0
+    base_semantic_diversity: float | None = None
+    trained_semantic_diversity: float | None = None
+    semantic_diversity_change: float | None = None
+    per_category: dict[str, dict[str, float]] = field(default_factory=dict)
+
+
+@dataclass
 class BehaviourResult:
     """Complete behaviour analysis results."""
 
@@ -319,6 +355,8 @@ class BehaviourResult:
     strategy_analysis: StrategyShiftAnalysis
     cot_analysis: ChainOfThoughtAnalysis
     calibration: CalibrationAnalysis | None = None
+    diversity: DiversityAnalysis | None = None
+    token_divergence: TokenDivergenceAnalysis | None = None
 
     @property
     def summary(self) -> str:

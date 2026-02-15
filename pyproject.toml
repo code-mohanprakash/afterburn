@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "afterburn"
-version = "0.2.0"
+version = "0.3.0"
 description = "Post-training diagnostics for LLMs — what did fine-tuning actually do to your model?"
 readme = "README.md"
 license = "MIT"
@@ -39,6 +39,7 @@ dependencies = [
 
 [project.optional-dependencies]
 pdf = ["weasyprint>=60"]
+semantic = ["sentence-transformers>=2.2"]
 dev = [
     "afterburn[pdf]",
     "pytest>=7.4",
@@ -52,9 +53,9 @@ dev = [
 afterburn = "afterburn.cli.main:cli"
 
 [project.urls]
-Homepage = "https://github.com/afterburn-llm/afterburn"
-Documentation = "https://afterburn.dev"
-Repository = "https://github.com/afterburn-llm/afterburn"
+Homepage = "https://github.com/code-mohanprakash/afterburn"
+Documentation = "https://github.com/code-mohanprakash/afterburn"
+Repository = "https://github.com/code-mohanprakash/afterburn"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/afterburn"]

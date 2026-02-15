@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import torch
 
 
@@ -69,3 +71,75 @@ def mean_abs_diff(base: torch.Tensor, trained: torch.Tensor) -> float:
     """Compute mean absolute element-wise difference."""
     diff = (trained.float() - base.float()).abs()
     return diff.mean().item()
+
+
+@dataclass(frozen=True)
+class SVDResult:
+    """SVD decomposition of a weight diff matrix."""
+
+    top_singular_values: list[float]
+    effective_rank: int
+    concentration_ratio: float
+    stable_rank: float
+
+
+def svd_analysis(
+    base: torch.Tensor,
+    trained: torch.Tensor,
+    top_k: int = 10,
+    energy_threshold: float = 0.9,
+) -> SVDResult | None:
+    """Compute SVD of the weight difference matrix.
+
+    Returns top-k singular values, effective rank (number of singular values
+    needed to capture energy_threshold of total energy), concentration ratio
+    (top-1 / sum), and stable rank (sum of squares / max squared).
+
+    Returns None for 1D tensors (biases) where SVD is not meaningful.
+    """
+    diff = trained.float() - base.float()
+
+    # SVD only meaningful for 2D+ tensors
+    if diff.dim() < 2:
+        return None
+
+    # Reshape to 2D for SVD
+    mat = diff.reshape(diff.shape[0], -1)
+
+    # Use truncated SVD for efficiency — we only need top singular values
+    k = min(top_k, min(mat.shape))
+    try:
+        # torch.svd_lowrank is faster than full SVD for large matrices
+        _, s, _ = torch.svd_lowrank(mat, q=k)
+    except Exception:
+        # Fallback to full SVD if lowrank fails
+        try:
+            _, s, _ = torch.linalg.svd(mat, full_matrices=False)
+        except Exception:
+            return None
+
+    if s.numel() == 0:
+        return None
+
+    s_list = s[:top_k].tolist()
+    s_sum = s.sum().item()
+    s_sq_sum = (s ** 2).sum().item()
+    s_max_sq = (s[0] ** 2).item()
+
+    # Effective rank: how many singular values to capture threshold of energy
+    cumulative_energy = torch.cumsum(s ** 2, dim=0) / max(s_sq_sum, 1e-10)
+    effective_rank = int((cumulative_energy < energy_threshold).sum().item()) + 1
+    effective_rank = min(effective_rank, s.numel())
+
+    # Concentration ratio: how much of total is in top-1
+    concentration = s[0].item() / max(s_sum, 1e-10)
+
+    # Stable rank: frobenius^2 / spectral_norm^2
+    stable_rank = s_sq_sum / max(s_max_sq, 1e-10)
+
+    return SVDResult(
+        top_singular_values=s_list,
+        effective_rank=effective_rank,
+        concentration_ratio=concentration,
+        stable_rank=stable_rank,
+    )

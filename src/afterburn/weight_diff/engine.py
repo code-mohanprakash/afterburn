@@ -27,7 +27,9 @@ from afterburn.weight_diff.metrics import (
     frobenius_norm_diff,
     l2_norm_diff,
     relative_change,
+    svd_analysis,
 )
+from afterburn.weight_diff.spectral import spectral_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +188,18 @@ class WeightDiffEngine:
         base_flat = torch.cat([base_params[k].flatten() for k in sorted(common_keys)])
         trained_flat = torch.cat([trained_params[k].flatten() for k in sorted(common_keys)])
 
+        # SVD analysis on the largest 2D weight matrix in this layer
+        svd_result = None
+        spectral_result = None
+        for k in sorted(common_keys):
+            if base_params[k].dim() >= 2:
+                if svd_result is None:
+                    svd_result = svd_analysis(base_params[k], trained_params[k])
+                if spectral_result is None:
+                    spectral_result = spectral_analysis(trained_params[k])
+                if svd_result is not None and spectral_result is not None:
+                    break
+
         return LayerDiff(
             layer_name=layer_name,
             layer_index=layer_index,
@@ -194,6 +208,13 @@ class WeightDiffEngine:
             frobenius_norm=frobenius_norm_diff(base_flat, trained_flat),
             relative_change=relative_change(base_flat, trained_flat),
             param_count=base_flat.numel(),
+            svd_top_singular_values=tuple(svd_result.top_singular_values) if svd_result else None,
+            svd_effective_rank=svd_result.effective_rank if svd_result else None,
+            svd_concentration_ratio=svd_result.concentration_ratio if svd_result else None,
+            svd_stable_rank=svd_result.stable_rank if svd_result else None,
+            spectral_alpha=spectral_result.alpha if spectral_result else None,
+            spectral_alpha_quality=spectral_result.alpha_quality if spectral_result else None,
+            spectral_stable_rank=spectral_result.stable_rank if spectral_result else None,
         )
 
 

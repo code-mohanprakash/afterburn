@@ -10,9 +10,11 @@ import torch
 
 from afterburn.behaviour.calibration import analyze_calibration
 from afterburn.behaviour.cot_analysis import analyze_chain_of_thought
+from afterburn.behaviour.diversity import analyze_diversity
 from afterburn.behaviour.format_analysis import analyze_format_compliance
 from afterburn.behaviour.length_analysis import analyze_length_distribution
 from afterburn.behaviour.reasoning import analyze_strategy_shift
+from afterburn.behaviour.token_divergence import analyze_token_divergence
 from afterburn.device import DeviceConfig
 from afterburn.loading.model_loader import ModelLoader
 from afterburn.prompts.runner import PromptRunner
@@ -121,6 +123,13 @@ class BehaviourAnalyser:
         strategy_analysis = analyze_strategy_shift(base_results, trained_results)
         cot_analysis = analyze_chain_of_thought(base_results, trained_results)
         calibration = analyze_calibration(base_results, trained_results)
+        diversity = analyze_diversity(
+            [r.output_text for r in base_results],
+            [r.output_text for r in trained_results],
+            base_categories=[r.category for r in base_results],
+            trained_categories=[r.category for r in trained_results],
+        )
+        token_divergence = analyze_token_divergence(base_results, trained_results)
 
         if self._progress:
             self._progress("Complete", 4, 4)
@@ -133,6 +142,8 @@ class BehaviourAnalyser:
             strategy_analysis=strategy_analysis,
             cot_analysis=cot_analysis,
             calibration=calibration,
+            diversity=diversity,
+            token_divergence=token_divergence,
         )
 
     def _load_prompts(self) -> list:
