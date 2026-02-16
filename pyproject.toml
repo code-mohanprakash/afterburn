@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "afterburn"
-version = "0.6.0"
+version = "0.6.1"
 description = "Post-training diagnostics for LLMs — what did fine-tuning actually do to your model?"
 readme = "README.md"
 license = "MIT"
