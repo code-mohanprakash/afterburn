@@ -1,0 +1,50 @@
+site_name: Afterburn
+site_description: Post-training diagnostics for LLMs
+site_url: https://code-mohanprakash.github.io/afterburn/
+repo_url: https://github.com/code-mohanprakash/afterburn
+repo_name: code-mohanprakash/afterburn
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep orange
+      accent: orange
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+    - scheme: default
+      primary: deep orange
+      accent: orange
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - search.suggest
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Configuration: getting-started/configuration.md
+  - User Guide:
+    - Weight Diff Analysis: guide/weight-diff.md
+    - Behavioral Analysis: guide/behaviour.md
+    - Reward Hacking Detection: guide/reward-hacking.md
+    - Reports: guide/reports.md
+    - Production Deployment: guide/deployment.md
+  - API Reference:
+    - Diagnoser: api/diagnoser.md
+    - Types: api/types.md
+  - Contributing: contributing.md
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.tabbed:
+      alternate_style: true

@@ -1,6 +1,5 @@
 """Tests for CLI commands."""
 
-import pytest
 from click.testing import CliRunner
 
 from afterburn.cli.main import cli

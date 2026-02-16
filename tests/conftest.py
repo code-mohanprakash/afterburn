@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import json
-import shutil
-from pathlib import Path
 
-import numpy as np
 import pytest
 import torch
 
@@ -16,10 +13,8 @@ from afterburn.types import (
     ChainOfThoughtAnalysis,
     FormatAnalysis,
     LengthAnalysis,
-    ModelPair,
     PromptResult,
     StrategyShiftAnalysis,
-    TrainingMethod,
 )
 
 
@@ -43,7 +38,7 @@ def tiny_model_pair(tmp_path):
     num_layers = 4
     num_heads = 4
     vocab_size = 256
-    head_dim = hidden_size // num_heads
+    hidden_size // num_heads
 
     config = {
         "architectures": ["LlamaForCausalLM"],

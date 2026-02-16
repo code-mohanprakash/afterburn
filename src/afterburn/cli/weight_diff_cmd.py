@@ -19,10 +19,10 @@ from afterburn.exceptions import AfterburnError
 )
 @click.option("--top-n", default=5, help="Number of top changed layers to show")
 @click.option("-o", "--output", default=None, help="Output file path (json or html)")
-def weight_diff(base, trained, device, top_n, output):
+def weight_diff(base: str, trained: str, device: str, top_n: int, output: str) -> None:
     """Analyze weight differences between base and trained models."""
     from afterburn.device import auto_detect_device
-    from afterburn.types import ModelPair, TrainingMethod
+    from afterburn.types import ModelPair
     from afterburn.weight_diff.engine import WeightDiffEngine
 
     print_header()
@@ -34,7 +34,7 @@ def weight_diff(base, trained, device, top_n, output):
         with create_progress() as progress:
             task = progress.add_task("Analyzing weights...", total=100)
 
-            def on_progress(step: str, current: int, total: int):
+            def on_progress(step: str, current: int, total: int) -> None:
                 pct = int(current / max(total, 1) * 100)
                 progress.update(task, completed=pct, description=f"Layer: {step}")
 
@@ -44,7 +44,7 @@ def weight_diff(base, trained, device, top_n, output):
 
         # Display results
         console.print()
-        console.print(f"[bold]Weight Diff Results[/]")
+        console.print("[bold]Weight Diff Results[/]")
         console.print(f"  Total params:   {result.total_param_count:,}")
         console.print(f"  Changed params: {result.changed_param_count:,}")
         console.print(f"  Concentration:  {result.change_concentration:.1%}")
@@ -66,7 +66,6 @@ def weight_diff(base, trained, device, top_n, output):
 
         # Save to file if requested
         if output:
-            from pathlib import Path
             from afterburn.types import DiagnosticReport
 
             report = DiagnosticReport(model_pair=model_pair, weight_diff=result)
@@ -77,7 +76,7 @@ def weight_diff(base, trained, device, top_n, output):
 
     except AfterburnError as e:
         print_error(str(e))
-        raise SystemExit(1)
+        raise SystemExit(1) from e
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted.[/]")
-        raise SystemExit(130)
+        raise SystemExit(130) from None

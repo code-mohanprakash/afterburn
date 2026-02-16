@@ -8,18 +8,16 @@ from collections import defaultdict
 import numpy as np
 from scipy import stats
 
-from afterburn.types import LengthBiasResult, PromptResult
-
-# Thresholds
-COHENS_D_THRESHOLD = 0.5
-LENGTH_RATIO_CONCERN = 1.3  # 30% longer is concerning
-PER_CATEGORY_BIAS_THRESHOLD = 0.4  # Cohen's d threshold for per-category bias
+from afterburn.ci import cohens_d_ci
+from afterburn.types import ConfidenceInterval, LengthBiasResult, PromptResult
 
 
 def detect_length_bias(
     base_results: list[PromptResult],
     trained_results: list[PromptResult],
-    threshold: float = COHENS_D_THRESHOLD,
+    threshold: float = 0.5,
+    length_ratio_concern: float = 1.3,
+    per_category_threshold: float = 0.4,
 ) -> LengthBiasResult:
     """Detect systematic length increase without quality improvement.
 
@@ -62,7 +60,11 @@ def detect_length_bias(
     cohens_d = _compute_cohens_d(base_lengths, trained_lengths)
 
     # Per-category analysis
-    per_category = _compute_per_category_bias(base_results, trained_results)
+    per_category = _compute_per_category_bias(
+        base_results, trained_results,
+        bias_threshold=per_category_threshold,
+        ratio_concern=length_ratio_concern,
+    )
 
     # Score: calibrated sigmoid mapping
     # Higher Cohen's d → higher score
@@ -89,7 +91,7 @@ def detect_length_bias(
     is_flagged = (
         p_value < 0.05
         and cohens_d > threshold
-        and mean_ratio > LENGTH_RATIO_CONCERN
+        and mean_ratio > length_ratio_concern
     )
 
     # Generate detail message
@@ -113,6 +115,10 @@ def detect_length_bias(
             f"No significant length bias detected."
         )
 
+    # Confidence interval for Cohen's d
+    d_lower, d_upper = cohens_d_ci(base_lengths, trained_lengths)
+    ci = ConfidenceInterval(lower=d_lower, upper=d_upper)
+
     return LengthBiasResult(
         score=min(score, 100.0),
         cohens_d=cohens_d,
@@ -121,28 +127,31 @@ def detect_length_bias(
         is_flagged=is_flagged,
         detail=detail,
         per_category=per_category,
+        cohens_d_ci=ci,
     )
 
 
-def _compute_cohens_d(group1: np.ndarray, group2: np.ndarray) -> float:
+def _compute_cohens_d(group1: object, group2: object) -> float:
     """Compute Cohen's d effect size."""
-    n1, n2 = len(group1), len(group2)
+    n1, n2 = len(group1), len(group2)  # type: ignore[arg-type]
     if n1 < 2 or n2 < 2:
         return 0.0
 
-    var1 = float(np.var(group1, ddof=1))
-    var2 = float(np.var(group2, ddof=1))
+    var1 = float(np.var(group1, ddof=1))  # type: ignore[call-overload]
+    var2 = float(np.var(group2, ddof=1))  # type: ignore[call-overload]
 
     pooled_std = math.sqrt(((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2))
     if pooled_std < 1e-10:
         return 0.0
 
-    return float((np.mean(group2) - np.mean(group1)) / pooled_std)
+    return float((np.mean(group2) - np.mean(group1)) / pooled_std)  # type: ignore[call-overload]
 
 
 def _compute_per_category_bias(
     base_results: list[PromptResult],
     trained_results: list[PromptResult],
+    bias_threshold: float = 0.4,
+    ratio_concern: float = 1.3,
 ) -> dict[str, dict[str, float]]:
     """Compute length bias metrics for each category.
 
@@ -183,8 +192,8 @@ def _compute_per_category_bias(
 
         # Flag category as biased if Cohen's d exceeds threshold and ratio is high
         is_biased = (
-            cohens_d > PER_CATEGORY_BIAS_THRESHOLD
-            and mean_ratio > LENGTH_RATIO_CONCERN
+            cohens_d > bias_threshold
+            and mean_ratio > ratio_concern
         )
 
         per_category[category] = {

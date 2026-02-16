@@ -36,7 +36,14 @@ from afterburn.exceptions import AfterburnError
     help="Compute device",
 )
 @click.option("-o", "--output", default=None, help="Output file path")
-def hack_check(base, trained, method, suites, device, output):
+def hack_check(
+    base: str,
+    trained: str,
+    method: str,
+    suites: tuple[str, ...],
+    device: str,
+    output: str,
+) -> None:
     """Check for reward hacking patterns in a trained model."""
     from afterburn.diagnoser import Diagnoser
 
@@ -55,7 +62,7 @@ def hack_check(base, trained, method, suites, device, output):
         with create_progress() as progress:
             task = progress.add_task("Checking for reward hacking...", total=100)
 
-            def on_progress(step: str, current: int, total: int):
+            def on_progress(step: str, current: int, total: int) -> None:
                 pct = int(current / max(total, 1) * 100)
                 progress.update(task, completed=pct, description=step)
 
@@ -71,10 +78,16 @@ def hack_check(base, trained, method, suites, device, output):
 
             # Sub-scores
             console.print("  [bold]Score Breakdown:[/]")
-            console.print(f"    Length Bias:       {rh.length_bias.score:5.1f}/100  {'⚠' if rh.length_bias.is_flagged else '✓'}")
-            console.print(f"    Format Gaming:    {rh.format_gaming.score:5.1f}/100  {'⚠' if rh.format_gaming.is_flagged else '✓'}")
-            console.print(f"    Strategy Collapse: {rh.strategy_collapse.score:5.1f}/100  {'⚠' if rh.strategy_collapse.is_flagged else '✓'}")
-            console.print(f"    Sycophancy:       {rh.sycophancy.score:5.1f}/100  {'⚠' if rh.sycophancy.is_flagged else '✓'}")
+            lb_flag = "⚠" if rh.length_bias.is_flagged else "✓"
+            console.print(f"    Length Bias:       {rh.length_bias.score:5.1f}/100  {lb_flag}")
+            fg_flag = "⚠" if rh.format_gaming.is_flagged else "✓"
+            console.print(f"    Format Gaming:    {rh.format_gaming.score:5.1f}/100  {fg_flag}")
+            sc_flag = "⚠" if rh.strategy_collapse.is_flagged else "✓"
+            console.print(
+                f"    Strategy Collapse: {rh.strategy_collapse.score:5.1f}/100  {sc_flag}"
+            )
+            syc_flag = "⚠" if rh.sycophancy.is_flagged else "✓"
+            console.print(f"    Sycophancy:       {rh.sycophancy.score:5.1f}/100  {syc_flag}")
             console.print()
 
             if rh.flags:
@@ -84,7 +97,6 @@ def hack_check(base, trained, method, suites, device, output):
                 console.print()
 
         if output:
-            from pathlib import Path
             out_path = report.save(output)
             console.print(f"[green]Report saved to {out_path}[/]")
 
@@ -92,7 +104,7 @@ def hack_check(base, trained, method, suites, device, output):
 
     except AfterburnError as e:
         print_error(str(e))
-        raise SystemExit(1)
+        raise SystemExit(1) from e
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted.[/]")
-        raise SystemExit(130)
+        raise SystemExit(130) from None

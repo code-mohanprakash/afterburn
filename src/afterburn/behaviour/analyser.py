@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import gc
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 import torch
 
@@ -15,11 +15,12 @@ from afterburn.behaviour.format_analysis import analyze_format_compliance
 from afterburn.behaviour.length_analysis import analyze_length_distribution
 from afterburn.behaviour.reasoning import analyze_strategy_shift
 from afterburn.behaviour.token_divergence import analyze_token_divergence
+from afterburn.config import BehaviourConfig
 from afterburn.device import DeviceConfig
 from afterburn.loading.model_loader import ModelLoader
 from afterburn.prompts.runner import PromptRunner
 from afterburn.prompts.suite import PromptSuite
-from afterburn.types import BehaviourResult, ModelPair, PromptResult
+from afterburn.types import BehaviourResult, ModelPair
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class BehaviourAnalyser:
         temperature: float = 0.0,
         collect_logits: bool = False,
         progress_callback: Callable[[str, int, int], None] | None = None,
+        config: BehaviourConfig | None = None,
     ):
         self.model_pair = model_pair
         self.device_config = device_config
@@ -52,6 +54,7 @@ class BehaviourAnalyser:
         self.temperature = temperature
         self.collect_logits = collect_logits
         self._progress = progress_callback
+        self.config = config or BehaviourConfig()
 
     def run(self) -> BehaviourResult:
         """Execute full behaviour analysis."""
@@ -78,7 +81,7 @@ class BehaviourAnalyser:
             collect_logits=self.collect_logits,
             top_k_probs=5,
         )
-        base_results = runner.run_suite(all_prompts)
+        base_results = runner.run_suite(all_prompts)  # type: ignore[arg-type]
 
         # Unload base model
         loader.unload_model(base_model)
@@ -104,7 +107,7 @@ class BehaviourAnalyser:
             collect_logits=self.collect_logits,
             top_k_probs=5,
         )
-        trained_results = runner.run_suite(all_prompts)
+        trained_results = runner.run_suite(all_prompts)  # type: ignore[arg-type]
 
         # Unload trained model
         loader.unload_model(trained_model)
@@ -118,7 +121,11 @@ class BehaviourAnalyser:
         if self._progress:
             self._progress("Analyzing behaviour", 2, 4)
 
-        length_analysis = analyze_length_distribution(base_results, trained_results)
+        length_analysis = analyze_length_distribution(
+            base_results, trained_results,
+            significance_level=self.config.significance_level,
+            effect_size_threshold=self.config.effect_size_threshold,
+        )
         format_analysis = analyze_format_compliance(base_results, trained_results)
         strategy_analysis = analyze_strategy_shift(base_results, trained_results)
         cot_analysis = analyze_chain_of_thought(base_results, trained_results)
@@ -130,6 +137,18 @@ class BehaviourAnalyser:
             trained_categories=[r.category for r in trained_results],
         )
         token_divergence = analyze_token_divergence(base_results, trained_results)
+
+        # Apply Benjamini-Hochberg FDR correction across all p-values
+        from afterburn.ci import benjamini_hochberg
+
+        p_values = [length_analysis.p_value]
+        if p_values[0] < 1.0:
+            corrected = benjamini_hochberg(p_values, alpha=self.config.significance_level)
+            length_analysis.corrected_p_value = corrected[0][0]
+            # Re-evaluate significance with corrected p-value
+            length_analysis.is_significant = (
+                corrected[0][1] and abs(length_analysis.cohens_d) > self.config.effect_size_threshold
+            )
 
         if self._progress:
             self._progress("Complete", 4, 4)
@@ -146,7 +165,7 @@ class BehaviourAnalyser:
             token_divergence=token_divergence,
         )
 
-    def _load_prompts(self) -> list:
+    def _load_prompts(self) -> list[object]:
         """Load all configured prompt suites."""
         from afterburn.types import Prompt
 
@@ -154,4 +173,4 @@ class BehaviourAnalyser:
         for name in self.suite_names:
             suite = PromptSuite.load(name)
             all_prompts.extend(suite.prompts)
-        return all_prompts
+        return all_prompts  # type: ignore[return-value]

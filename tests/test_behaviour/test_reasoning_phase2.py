@@ -1,6 +1,5 @@
 """Tests for reasoning strategy classifier (simplified priority-based)."""
 
-import pytest
 
 from afterburn.behaviour.reasoning import (
     ClassificationResult,

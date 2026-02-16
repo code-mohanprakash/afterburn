@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from collections import Counter
 
@@ -22,7 +23,9 @@ FORMAT_PATTERNS: dict[str, str] = {
     "table_format": r"\|.*\|.*\|",
     "xml_tags": r"<[^>]+>.*?</[^>]+>",
     "thinking_tags": r"<think>[\s\S]*?</think>",
-    "verification_marker": r"(?:Let me verify|Let's verify|Let me check|Let's check|Verification)[:\s]",
+    "verification_marker": (
+        r"(?:Let me verify|Let's verify|Let me check|Let's check|Verification)[:\s]"
+    ),
 }
 
 
@@ -92,9 +95,10 @@ def analyze_format_compliance(
     # Per-category analysis
     per_category = _compute_per_category_analysis(base_results, trained_results)
 
-    # Format diversity: count of distinct patterns used
-    base_diversity = float(len(base_pattern_usage))
-    trained_diversity = float(len(trained_pattern_usage))
+    # Format diversity: Shannon entropy over pattern frequency distribution
+    # Higher entropy = more evenly distributed pattern usage = more diverse
+    base_diversity = _shannon_entropy(base_pattern_usage)
+    trained_diversity = _shannon_entropy(trained_pattern_usage)
 
     return FormatAnalysis(
         patterns_detected=patterns_detected,
@@ -189,3 +193,21 @@ def _compute_per_category_analysis(
     return per_category
 
 
+def _shannon_entropy(counter: Counter[str]) -> float:
+    """Compute Shannon entropy of a frequency distribution.
+
+    H = -sum(p_i * log2(p_i)) where p_i = count_i / total
+
+    Returns 0.0 for empty counters. Maximum entropy = log2(num_categories).
+    """
+    total = sum(counter.values())
+    if total == 0:
+        return 0.0
+
+    entropy = 0.0
+    for count in counter.values():
+        if count > 0:
+            p = count / total
+            entropy -= p * math.log2(p)
+
+    return entropy

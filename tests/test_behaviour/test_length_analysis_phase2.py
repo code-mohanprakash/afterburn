@@ -1,5 +1,6 @@
 """Tests for Phase 2 length analysis enhancements (skewness, kurtosis, percentiles)."""
 
+import numpy as np
 import pytest
 
 from afterburn.behaviour.length_analysis import (
@@ -9,8 +10,6 @@ from afterburn.behaviour.length_analysis import (
     analyze_length_distribution,
 )
 from afterburn.types import PromptResult
-
-import numpy as np
 
 
 def _make_results(lengths: list[int], category: str = "test") -> list[PromptResult]:

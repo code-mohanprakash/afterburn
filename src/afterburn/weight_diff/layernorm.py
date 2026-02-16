@@ -10,16 +10,12 @@ from afterburn.types import LayerNormShift
 
 logger = logging.getLogger(__name__)
 
-# Threshold for significance (relative change in LayerNorm params)
-SIGNIFICANCE_THRESHOLD = 0.01
-
-
 def detect_layernorm_shift(
     base_params: dict[str, torch.Tensor],
     trained_params: dict[str, torch.Tensor],
     layer_name: str,
     layer_index: int,
-    threshold: float = SIGNIFICANCE_THRESHOLD,
+    threshold: float = 0.01,
 ) -> LayerNormShift | None:
     """Detect significant shifts in LayerNorm parameters.
 
@@ -47,13 +43,21 @@ def detect_layernorm_shift(
 
     # Compute beta (bias) shift if present
     beta_shift = 0.0
+    beta_relative = 0.0
     if beta_key and beta_key in base_params and beta_key in trained_params:
         base_beta = base_params[beta_key].float()
         trained_beta = trained_params[beta_key].float()
         beta_diff = (trained_beta - base_beta).abs()
         beta_shift = beta_diff.mean().item()
+        base_beta_mean = base_beta.abs().mean().item()
+        if base_beta_mean > 1e-6:
+            beta_relative = beta_shift / base_beta_mean
 
-    total_shift = gamma_relative + beta_shift
+    # Average relative changes (both dimensionless) for consistent significance check
+    if beta_key and beta_key in base_params and beta_key in trained_params:
+        total_shift = (gamma_relative + beta_relative) / 2.0
+    else:
+        total_shift = gamma_relative
     is_significant = total_shift > threshold
 
     return LayerNormShift(

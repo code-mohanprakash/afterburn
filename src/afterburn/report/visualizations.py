@@ -10,7 +10,6 @@ from afterburn.types import (
     ChainOfThoughtAnalysis,
     EmbeddingDrift,
     LayerDiff,
-    LayerNormShift,
     LengthAnalysis,
     RiskLevel,
     StrategyShiftAnalysis,
@@ -435,7 +434,6 @@ def create_format_pattern_radar(
     trained_rates = [patterns_detected[p].get("trained_rate", 0.0) * 100 for p in patterns]
 
     # Close the polygon by repeating first value
-    patterns_closed = patterns + [patterns[0]] if patterns else []
     base_rates_closed = base_rates + [base_rates[0]] if base_rates else []
     trained_rates_closed = trained_rates + [trained_rates[0]] if trained_rates else []
 
@@ -494,7 +492,8 @@ def create_embedding_drift_chart(embedding_drift: EmbeddingDrift) -> str:
         embedding_drift.output_embedding_cosine or 0.0,
     ]
 
-    # Use different colors for L2 (distance, lower is better) vs Cosine (similarity, higher is better)
+    # Use different colors for L2 (distance, lower is better)
+    # vs Cosine (similarity, higher is better)
     colors = ["#f44336", "#4caf50", "#f44336", "#4caf50"]
 
     data = {
@@ -564,10 +563,10 @@ def create_sycophancy_chart(sycophancy: SycophancyResult) -> str:
     return _plotly_div("sycophancy", data)
 
 
-def _plotly_div(div_id: str, data: dict) -> str:
+def _plotly_div(div_id: str, data: object) -> str:
     """Wrap Plotly data in an HTML div with inline JS."""
-    json_str = json.dumps(data["data"])
-    layout_str = json.dumps(data["layout"])
+    json_str = json.dumps(data["data"])  # type: ignore[index]
+    layout_str = json.dumps(data["layout"])  # type: ignore[index]
     return (
         f'<div id="{div_id}"></div>\n'
         f"<script>Plotly.newPlot('{div_id}', {json_str}, {layout_str}, "

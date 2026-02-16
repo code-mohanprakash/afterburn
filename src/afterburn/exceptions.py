@@ -33,3 +33,7 @@ class ConfigError(AfterburnError):
 
 class ReportGenerationError(AfterburnError):
     """Error generating a report."""
+
+
+class PathValidationError(AfterburnError):
+    """Invalid or unsafe path detected."""

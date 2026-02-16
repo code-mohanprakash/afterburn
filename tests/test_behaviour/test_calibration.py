@@ -3,7 +3,6 @@
 import pytest
 
 from afterburn.behaviour.calibration import (
-    NUM_BINS,
     _compute_calibration_bins,
     _compute_ece,
     _extract_confidence_accuracy,

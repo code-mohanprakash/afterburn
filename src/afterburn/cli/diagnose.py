@@ -54,7 +54,17 @@ from afterburn.types import ReportFormat
     help="Compute device (auto-detected if not set)",
 )
 @click.option("--config", type=click.Path(exists=True), default=None, help="Config file path")
-def diagnose(base, trained, method, output, fmt, suites, modules, device, config):
+def diagnose(
+    base: str,
+    trained: str,
+    method: str,
+    output: str,
+    fmt: str,
+    suites: tuple[str, ...],
+    modules: tuple[str, ...],
+    device: str,
+    config: str,
+) -> None:
     """Run full diagnostic analysis on a base/trained model pair."""
     from afterburn.diagnoser import Diagnoser
 
@@ -79,7 +89,7 @@ def diagnose(base, trained, method, output, fmt, suites, modules, device, config
         with create_progress() as progress:
             task = progress.add_task("Running diagnostics...", total=100)
 
-            def on_progress(step: str, current: int, total: int):
+            def on_progress(step: str, current: int, total: int) -> None:
                 pct = int(current / max(total, 1) * 100)
                 progress.update(task, completed=pct, description=step)
 
@@ -88,10 +98,7 @@ def diagnose(base, trained, method, output, fmt, suites, modules, device, config
 
         # Save report
         output_path = Path(output)
-        if fmt:
-            report_format = ReportFormat(fmt)
-        else:
-            report_format = None  # Auto-detect
+        report_format = ReportFormat(fmt) if fmt else None  # Auto-detect
 
         report.save(output_path, fmt=report_format)
 
@@ -112,12 +119,17 @@ def diagnose(base, trained, method, output, fmt, suites, modules, device, config
                 )
 
         console.print()
-        console.print(f"  [dim]{report.summary[:200]}...[/]" if len(report.summary) > 200 else f"  [dim]{report.summary}[/]")
+        summary_text = (
+            f"  [dim]{report.summary[:200]}...[/]"
+            if len(report.summary) > 200
+            else f"  [dim]{report.summary}[/]"
+        )
+        console.print(summary_text)
         console.print()
 
     except AfterburnError as e:
         print_error(str(e))
-        raise SystemExit(1)
+        raise SystemExit(1) from e
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted.[/]")
-        raise SystemExit(130)
+        raise SystemExit(130) from None

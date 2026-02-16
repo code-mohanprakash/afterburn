@@ -1,6 +1,5 @@
 """Tests for the reward hack detector."""
 
-import pytest
 
 from afterburn.reward_hack.detector import RewardHackDetector
 from afterburn.types import TrainingMethod

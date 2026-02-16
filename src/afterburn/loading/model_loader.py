@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 import torch
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, PreTrainedModel, PreTrainedTokenizer
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PreTrainedModel,
+    PreTrainedTokenizer,
+)
 
-from afterburn.device import DeviceConfig
+from afterburn.device import DeviceConfig, estimate_model_memory_gb, register_cleanup
 from afterburn.exceptions import IncompatibleModelsError, ModelLoadError, ModelNotFoundError
 from afterburn.loading.checkpoint import CheckpointInfo, detect_checkpoint
 
@@ -32,7 +37,8 @@ class ModelLoader:
     def load_config(self, model_id: str) -> AutoConfig:
         """Load only the model config (no weights)."""
         try:
-            return AutoConfig.from_pretrained(model_id, trust_remote_code=False)
+            config: AutoConfig = AutoConfig.from_pretrained(model_id, trust_remote_code=False)
+            return config
         except OSError as e:
             if "does not appear to have" in str(e) or "not found" in str(e).lower():
                 raise ModelNotFoundError(
@@ -43,15 +49,40 @@ class ModelLoader:
     def load_tokenizer(self, model_id: str) -> PreTrainedTokenizer:
         """Load tokenizer for a model."""
         try:
-            tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=False)
+            tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=False)  # type: ignore[no-untyped-call]
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
-            return tokenizer
+            tok: PreTrainedTokenizer = tokenizer
+            return tok
         except Exception as e:
             raise ModelLoadError(f"Failed to load tokenizer for '{model_id}': {e}") from e
 
     def load_model(self, model_id: str) -> PreTrainedModel:
         """Load a full model for inference."""
+        # Memory estimation before loading
+        try:
+            config = self.load_config(model_id)
+            num_params = self._estimate_num_parameters(config)
+            if num_params > 0:
+                estimated_gb = estimate_model_memory_gb(num_params, self.device_config.dtype)
+                if estimated_gb > self.device_config.max_memory_gb:
+                    logger.warning(
+                        "Model '%s' may not fit in memory: estimated %.2f GB, available %.2f GB. "
+                        "Loading will proceed but may fail with OOM.",
+                        model_id,
+                        estimated_gb,
+                        self.device_config.max_memory_gb,
+                    )
+                else:
+                    logger.debug(
+                        "Memory estimate for '%s': %.2f GB (%.2f GB available)",
+                        model_id,
+                        estimated_gb,
+                        self.device_config.max_memory_gb,
+                    )
+        except Exception as e:
+            logger.debug("Could not estimate memory for '%s': %s", model_id, e)
+
         try:
             model = AutoModelForCausalLM.from_pretrained(
                 model_id,
@@ -61,8 +92,14 @@ class ModelLoader:
                 low_cpu_mem_usage=True,
             )
             if not self.device_config.is_cuda:
-                model = model.to(self.device_config.device)
+                model = model.to(self.device_config.device)  # type: ignore[arg-type]
             model.eval()
+
+            # Register cleanup for this model
+            def cleanup_model() -> None:
+                self._cleanup_model(model)
+            register_cleanup(cleanup_model)
+
             return model
         except torch.cuda.OutOfMemoryError:
             logger.warning("GPU OOM loading '%s'. Falling back to CPU.", model_id)
@@ -75,6 +112,12 @@ class ModelLoader:
                 low_cpu_mem_usage=True,
             )
             model.eval()
+
+            # Register cleanup for this model
+            def cleanup_model() -> None:
+                self._cleanup_model(model)
+            register_cleanup(cleanup_model)
+
             return model
         except Exception as e:
             raise ModelLoadError(f"Failed to load model '{model_id}': {e}") from e
@@ -93,13 +136,58 @@ class ModelLoader:
 
         if mismatches:
             raise IncompatibleModelsError(
-                f"Models have incompatible architectures:\n"
+                "Models have incompatible architectures:\n"
                 + "\n".join(f"  - {m}" for m in mismatches)
             )
 
     def get_checkpoint_info(self, model_id: str) -> CheckpointInfo:
         """Get checkpoint info for a model."""
         return detect_checkpoint(model_id)
+
+    def _estimate_num_parameters(self, config: AutoConfig) -> int:
+        """Estimate the number of parameters from model config."""
+        # Try to get num_parameters if available
+        if hasattr(config, "num_parameters"):
+            return int(config.num_parameters)
+
+        # Estimate from architecture
+        hidden_size = getattr(config, "hidden_size", 0)
+        num_layers = getattr(config, "num_hidden_layers", 0)
+        intermediate_size = getattr(config, "intermediate_size", 0)
+        vocab_size = getattr(config, "vocab_size", 0)
+
+        if all([hidden_size, num_layers, vocab_size]):
+            # Rough estimate: embeddings + layers
+            if intermediate_size == 0:
+                intermediate_size = hidden_size * 4  # common default
+
+            # Embedding parameters
+            embed_params = vocab_size * hidden_size
+
+            # Per-layer parameters (simplified):
+            # - Self-attention: 4 * hidden_size^2 (Q, K, V, O projections)
+            # - FFN: 2 * hidden_size * intermediate_size
+            # - LayerNorms: ~4 * hidden_size (small, ignore for rough estimate)
+            per_layer = (4 * hidden_size * hidden_size) + (2 * hidden_size * intermediate_size)
+            layer_params = num_layers * per_layer
+
+            # Output head
+            head_params = vocab_size * hidden_size
+
+            total = embed_params + layer_params + head_params
+            logger.debug("Estimated parameters: %d (%.2fB)", total, total / 1e9)
+            return total
+
+        logger.debug("Could not estimate parameters from config")
+        return 0
+
+    @staticmethod
+    def _cleanup_model(model: PreTrainedModel) -> None:
+        """Cleanup function for registered models."""
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            del model
 
     @staticmethod
     def unload_model(model: PreTrainedModel) -> None:

@@ -3,25 +3,78 @@
 from __future__ import annotations
 
 import logging
+import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from afterburn.behaviour.analyser import BehaviourAnalyser
-from afterburn.config import AfterburnConfig, load_config
-from afterburn.device import DeviceConfig, auto_detect_device
+from afterburn.config import load_config
+from afterburn.device import auto_detect_device
+from afterburn.exceptions import PathValidationError
 from afterburn.report.summary import generate_recommendations, generate_summary
 from afterburn.reward_hack.detector import RewardHackDetector
 from afterburn.types import (
     BehaviourResult,
     DiagnosticReport,
     ModelPair,
-    ReportFormat,
     TrainingMethod,
     WeightDiffResult,
 )
 from afterburn.weight_diff.engine import WeightDiffEngine
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_model_id(model_id: str) -> None:
+    """Validate that a model ID is either a valid HuggingFace ID or an existing safe local path.
+
+    Args:
+        model_id: Either a HuggingFace model ID or local path.
+
+    Raises:
+        PathValidationError: If the model ID is invalid or unsafe.
+    """
+    # Check for empty or whitespace-only model IDs
+    if not model_id or not model_id.strip():
+        raise PathValidationError("Model ID cannot be empty")
+
+    # Check if it's a local path
+    path = Path(model_id)
+    if path.exists():
+        # Validate local path for safety
+        try:
+            resolved = path.resolve()
+
+            # Check for directory traversal patterns
+            path_str = str(model_id)
+            suspicious_patterns = ["/../", "/..", "\\..\\", "\\.."]
+
+            for pattern in suspicious_patterns:
+                if pattern in path_str:
+                    raise PathValidationError(
+                        f"Model path contains directory traversal pattern: {model_id}"
+                    )
+
+            if not resolved.is_absolute():
+                raise PathValidationError(f"Model path must be absolute: {model_id}")
+
+        except (OSError, RuntimeError) as e:
+            raise PathValidationError(f"Invalid model path: {model_id}. Error: {e}") from e
+    else:
+        # Validate HuggingFace model ID format
+        # Valid format: alphanumeric, hyphens, underscores, forward slashes, dots
+        # Examples: "meta-llama/Llama-3.1-8B", "gpt2", "org/model-name_v2.0"
+        if not re.match(r"^[\w\-./]+$", model_id):
+            raise PathValidationError(
+                f"Invalid model ID: {model_id}. Must be alphanumeric with hyphens, "
+                "underscores, slashes, and dots only."
+            )
+
+        # Additional safety checks
+        if ".." in model_id:
+            raise PathValidationError(
+                f"Model ID contains directory traversal pattern: {model_id}"
+            )
 
 
 class Diagnoser:
@@ -48,6 +101,10 @@ class Diagnoser:
         modules: list[str] | None = None,
         collect_logits: bool = False,
     ):
+        # Validate model IDs for safety
+        _validate_model_id(base_model)
+        _validate_model_id(trained_model)
+
         if isinstance(method, str):
             try:
                 method = TrainingMethod(method)
@@ -107,6 +164,7 @@ class Diagnoser:
                 self.model_pair,
                 self.device_config,
                 progress_callback=progress_callback,
+                config=self._config.weight_diff,
             )
             report.weight_diff = engine.run()
             report.top_changed_layers = report.weight_diff.top_changed_layers
@@ -123,6 +181,7 @@ class Diagnoser:
                 temperature=self._config.behaviour.temperature,
                 collect_logits=self.collect_logits,
                 progress_callback=progress_callback,
+                config=self._config.behaviour,
             )
             report.behaviour = analyser.run()
 
@@ -139,15 +198,17 @@ class Diagnoser:
             report.hack_score = report.reward_hack.composite_score
 
         # Step 4: Generate summary and recommendations
-        report.summary = generate_summary(report)
-        report.recommendations = generate_recommendations(report)
+        report.summary = generate_summary(report, config=self._config.report)
+        report.recommendations = generate_recommendations(report, config=self._config.report)
 
         logger.info("Diagnostic analysis complete.")
         return report
 
     def run_weight_diff(self) -> WeightDiffResult:
         """Run only weight diff analysis."""
-        engine = WeightDiffEngine(self.model_pair, self.device_config)
+        engine = WeightDiffEngine(
+            self.model_pair, self.device_config, config=self._config.weight_diff
+        )
         return engine.run()
 
     def run_behaviour(self) -> BehaviourResult:
@@ -160,6 +221,7 @@ class Diagnoser:
             batch_size=self._config.behaviour.batch_size,
             temperature=self._config.behaviour.temperature,
             collect_logits=self.collect_logits,
+            config=self._config.behaviour,
         )
         return analyser.run()
 
@@ -185,6 +247,6 @@ class Diagnoser:
             reward_hack=reward_hack,
             hack_score=reward_hack.composite_score,
         )
-        report.summary = generate_summary(report)
-        report.recommendations = generate_recommendations(report)
+        report.summary = generate_summary(report, config=self._config.report)
+        report.recommendations = generate_recommendations(report, config=self._config.report)
         return report

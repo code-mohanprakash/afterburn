@@ -24,7 +24,7 @@ from afterburn.exceptions import AfterburnError
     help="Compute device",
 )
 @click.option("-o", "--output", default=None, help="Output file path")
-def behaviour(base, trained, suites, device, output):
+def behaviour(base: str, trained: str, suites: tuple[str, ...], device: str, output: str) -> None:
     """Run behavioural shift analysis on a model pair."""
     from afterburn.behaviour.analyser import BehaviourAnalyser
     from afterburn.device import auto_detect_device
@@ -45,7 +45,7 @@ def behaviour(base, trained, suites, device, output):
         with create_progress() as progress:
             task = progress.add_task("Running behaviour analysis...", total=100)
 
-            def on_progress(step: str, current: int, total: int):
+            def on_progress(step: str, current: int, total: int) -> None:
                 pct = int(current / max(total, 1) * 100)
                 progress.update(task, completed=pct, description=step)
 
@@ -61,7 +61,7 @@ def behaviour(base, trained, suites, device, output):
         console.print()
 
         la = result.length_analysis
-        console.print(f"  [bold]Output Length:[/]")
+        console.print("  [bold]Output Length:[/]")
         console.print(f"    Base mean:    {la.base_mean:.1f} tokens")
         console.print(f"    Trained mean: {la.trained_mean:.1f} tokens")
         console.print(f"    Cohen's d:    {la.cohens_d:.2f}")
@@ -77,7 +77,6 @@ def behaviour(base, trained, suites, device, output):
         )
 
         if output:
-            from pathlib import Path
             from afterburn.types import DiagnosticReport
 
             report = DiagnosticReport(model_pair=model_pair, behaviour=result)
@@ -88,7 +87,7 @@ def behaviour(base, trained, suites, device, output):
 
     except AfterburnError as e:
         print_error(str(e))
-        raise SystemExit(1)
+        raise SystemExit(1) from e
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted.[/]")
-        raise SystemExit(130)
+        raise SystemExit(130) from None

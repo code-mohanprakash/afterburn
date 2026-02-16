@@ -85,13 +85,18 @@ def _compute_per_token_drift(
     k = min(top_k, per_token_drift.shape[0])
     top_values, top_indices = torch.topk(per_token_drift, k)
 
-    return [(idx.item(), val.item()) for idx, val in zip(top_indices, top_values)]
+    return [(idx.item(), val.item()) for idx, val in zip(top_indices, top_values, strict=False)]
 
 
 def _find_embedding_key(params: dict[str, torch.Tensor], is_input: bool) -> str | None:
     """Find embedding parameter key."""
     if is_input:
-        patterns = ["embed_tokens.weight", "wte.weight", "word_embeddings.weight", "embed_in.weight"]
+        patterns = [
+            "embed_tokens.weight",
+            "wte.weight",
+            "word_embeddings.weight",
+            "embed_in.weight",
+        ]
     else:
         patterns = ["lm_head.weight", "embed_out.weight"]
 

@@ -3,9 +3,13 @@
 Two complementary diversity metrics:
 
 1. **EAD** (Expectation-Adjusted Distinct N-grams): Lexical diversity.
-   Adapted from "Understanding the Effects of RLHF on LLM Generalisation
-   and Diversity" (Kirkman et al., ICLR 2024). Corrects for length bias
-   in standard distinct-n-gram metrics.
+   From "Rethinking and Refining the Distinct Metric" (Liu et al., ACL 2022),
+   referenced by Kirkman et al. (ICLR 2024). Corrects for length bias by
+   normalizing observed distinct n-grams against uniform random expectation:
+
+       EAD = D / (V * (1 - ((V-1)/V)^T))
+
+   where D = observed distinct n-grams, V = vocabulary size, T = total n-grams.
 
 2. **SBERT Semantic Diversity** (optional): Embeds outputs using a sentence
    transformer and computes average pairwise cosine similarity. Lower
@@ -15,33 +19,13 @@ Two complementary diversity metrics:
 from __future__ import annotations
 
 import logging
-from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+
+from afterburn.types import DiversityAnalysis
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-class DiversityAnalysis:
-    """Output diversity comparison between base and trained models."""
-
-    # EAD scores per n-gram level (1-5)
-    base_ead: dict[int, float] = field(default_factory=dict)
-    trained_ead: dict[int, float] = field(default_factory=dict)
-
-    # Aggregated diversity score (mean EAD across n=1..5)
-    base_diversity_score: float = 0.0
-    trained_diversity_score: float = 0.0
-    diversity_change: float = 0.0
-
-    # SBERT semantic diversity (1 - avg pairwise cosine similarity)
-    # None if sentence-transformers not installed
-    base_semantic_diversity: float | None = None
-    trained_semantic_diversity: float | None = None
-    semantic_diversity_change: float | None = None
-
-    # Per-category breakdown
-    per_category: dict[str, dict[str, float]] = field(default_factory=dict)
+# Re-export so existing imports from this module keep working
+__all__ = ["DiversityAnalysis", "analyze_diversity", "compute_semantic_diversity"]
 
 
 def analyze_diversity(
@@ -50,6 +34,7 @@ def analyze_diversity(
     base_categories: list[str] | None = None,
     trained_categories: list[str] | None = None,
     max_n: int = 5,
+    vocab_size: int | None = None,
 ) -> DiversityAnalysis:
     """Compare output diversity between base and trained model outputs.
 
@@ -59,12 +44,17 @@ def analyze_diversity(
         base_categories: Optional category labels for base outputs.
         trained_categories: Optional category labels for trained outputs.
         max_n: Maximum n-gram level (default 5).
+        vocab_size: External vocabulary size (e.g. tokenizer vocab). If None,
+            estimated from the union of all n-grams in both output sets.
 
     Returns:
         DiversityAnalysis with EAD scores and diversity comparison.
     """
-    base_ead = _compute_ead_all(base_outputs, max_n)
-    trained_ead = _compute_ead_all(trained_outputs, max_n)
+    # Estimate per-n vocabulary sizes from combined corpus if not provided
+    vocab_sizes = _estimate_vocab_sizes(base_outputs, trained_outputs, max_n, vocab_size)
+
+    base_ead = _compute_ead_all(base_outputs, max_n, vocab_sizes)
+    trained_ead = _compute_ead_all(trained_outputs, max_n, vocab_sizes)
 
     base_score = _mean_ead(base_ead)
     trained_score = _mean_ead(trained_ead)
@@ -85,8 +75,9 @@ def analyze_diversity(
                 if c == cat
             ]
             if base_cat and trained_cat:
-                b_ead = _mean_ead(_compute_ead_all(base_cat, max_n))
-                t_ead = _mean_ead(_compute_ead_all(trained_cat, max_n))
+                cat_vocab = _estimate_vocab_sizes(base_cat, trained_cat, max_n, vocab_size)
+                b_ead = _mean_ead(_compute_ead_all(base_cat, max_n, cat_vocab))
+                t_ead = _mean_ead(_compute_ead_all(trained_cat, max_n, cat_vocab))
                 per_category[cat] = {
                     "base_diversity": b_ead,
                     "trained_diversity": t_ead,
@@ -116,58 +107,73 @@ def analyze_diversity(
     )
 
 
-def _compute_ead_all(outputs: list[str], max_n: int) -> dict[int, float]:
+def _estimate_vocab_sizes(
+    base_outputs: list[str],
+    trained_outputs: list[str],
+    max_n: int,
+    fixed_vocab_size: int | None = None,
+) -> dict[int, int]:
+    """Estimate vocabulary size per n-gram level from combined outputs.
+
+    If fixed_vocab_size is provided, uses that for all n-gram levels.
+    Otherwise, uses the union of all distinct n-grams from both output sets.
+    """
+    vocab_sizes: dict[int, int] = {}
+    for n in range(1, max_n + 1):
+        if fixed_vocab_size is not None:
+            vocab_sizes[n] = fixed_vocab_size
+        else:
+            all_ngrams: set[tuple[str, ...]] = set()
+            for text in base_outputs + trained_outputs:
+                tokens = text.lower().split()
+                for ngram in _extract_ngrams(tokens, n):
+                    all_ngrams.add(ngram)
+            vocab_sizes[n] = max(len(all_ngrams), 1)
+    return vocab_sizes
+
+
+def _compute_ead_all(
+    outputs: list[str], max_n: int, vocab_sizes: dict[int, int]
+) -> dict[int, float]:
     """Compute EAD for n=1..max_n across all outputs."""
     result = {}
     for n in range(1, max_n + 1):
-        result[n] = _compute_ead(outputs, n)
+        result[n] = _compute_ead(outputs, n, vocab_sizes.get(n, 1))
     return result
 
 
-def _compute_ead(outputs: list[str], n: int) -> float:
+def _compute_ead(outputs: list[str], n: int, vocab_size: int) -> float:
     """Compute Expectation-Adjusted Distinct n-grams (EAD).
 
-    Standard distinct-n ratio = |unique n-grams| / |total n-grams|.
-    This is biased by length: longer text naturally has lower ratios.
+    From Liu et al. "Rethinking and Refining the Distinct Metric" (ACL 2022).
 
-    EAD corrects this by computing the expected distinct ratio for
-    uniformly random text of the same length, then normalizing:
+        EAD = D / (V * (1 - ((V-1)/V)^T))
 
-        EAD = (observed_distinct_ratio - expected_ratio) / (1 - expected_ratio)
-
-    When there aren't enough n-grams, we fall back to the raw distinct ratio.
+    where D = observed distinct n-grams, V = vocabulary size, T = total n-grams.
+    EAD ≈ 1.0 means diversity matches uniform random expectation.
+    EAD < 1.0 means less diverse (repetitive). EAD > 1.0 is possible but rare.
     """
-    # Tokenize all outputs into words
     all_ngrams: list[tuple[str, ...]] = []
     for text in outputs:
         tokens = text.lower().split()
         ngrams = _extract_ngrams(tokens, n)
         all_ngrams.extend(ngrams)
 
-    total = len(all_ngrams)
-    if total == 0:
+    total_ngrams = len(all_ngrams)
+    if total_ngrams == 0:
         return 0.0
 
-    unique = len(set(all_ngrams))
-    observed_ratio = unique / total
+    distinct_count = len(set(all_ngrams))
+    vocab = max(vocab_size, 1)
 
-    # Expected distinct ratio under uniform random sampling
-    # Using the coupon collector approximation:
-    # E[distinct] = V * (1 - (1 - 1/V)^T) where V = vocabulary size, T = total
-    # We estimate V from the observed unique count
-    # For the correction, we use the simpler approach from Liu et al. 2022:
-    # expected_ratio = 1 - (1 - 1/unique)^total when unique > 0
-    if unique <= 1 or total <= 1:
-        return observed_ratio
+    # Expected distinct n-grams under uniform random sampling from vocab V
+    # E[D] = V * (1 - ((V-1)/V)^T)
+    expected_distinct = vocab * (1.0 - ((vocab - 1) / vocab) ** total_ngrams)
 
-    expected_ratio = 1.0 - (1.0 - 1.0 / unique) ** total
-    if expected_ratio >= 1.0 - 1e-10:
-        return observed_ratio
+    if expected_distinct <= 0:
+        return 0.0
 
-    # Normalize: how much more diverse than random expectation
-    ead = (observed_ratio - expected_ratio) / (1.0 - expected_ratio)
-    # Clamp to [0, 1]
-    return max(0.0, min(1.0, ead))
+    return distinct_count / expected_distinct
 
 
 def _extract_ngrams(tokens: list[str], n: int) -> list[tuple[str, ...]]:
@@ -184,6 +190,18 @@ def _mean_ead(ead_dict: dict[int, float]) -> float:
     return sum(ead_dict.values()) / len(ead_dict)
 
 
+_sbert_model = None
+
+
+def _get_sbert_model() -> object:
+    """Lazy singleton for SentenceTransformer model."""
+    global _sbert_model
+    if _sbert_model is None:
+        from sentence_transformers import SentenceTransformer
+        _sbert_model = SentenceTransformer("all-MiniLM-L6-v2")
+    return _sbert_model
+
+
 def compute_semantic_diversity(outputs: list[str]) -> float | None:
     """Compute semantic diversity using sentence embeddings.
 
@@ -195,18 +213,15 @@ def compute_semantic_diversity(outputs: list[str]) -> float | None:
         return 0.0
 
     try:
-        from sentence_transformers import SentenceTransformer
         import numpy as np
+        model = _get_sbert_model()
     except ImportError:
         logger.debug("sentence-transformers not installed, skipping semantic diversity")
         return None
 
-    # Use a lightweight model for embedding
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-
     # Truncate very long outputs to first 512 chars for embedding
     truncated = [text[:512] for text in outputs]
-    embeddings = model.encode(truncated, normalize_embeddings=True)
+    embeddings = model.encode(truncated, normalize_embeddings=True)  # type: ignore[attr-defined]
 
     # Compute pairwise cosine similarity (already normalized = dot product)
     sim_matrix = np.dot(embeddings, embeddings.T)

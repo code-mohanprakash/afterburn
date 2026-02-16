@@ -5,16 +5,23 @@ from __future__ import annotations
 import math
 from collections import Counter
 
-from afterburn.behaviour.reasoning import classify_reasoning_strategy
-from afterburn.types import PromptResult, ReasoningStrategy, StrategyCollapseResult
+import numpy as np
 
-ENTROPY_DROP_THRESHOLD = 0.3
+from afterburn.behaviour.reasoning import classify_reasoning_strategy
+from afterburn.ci import bootstrap_ci
+from afterburn.types import (
+    ConfidenceInterval,
+    PromptResult,
+    ReasoningStrategy,
+    StrategyCollapseResult,
+)
 
 
 def detect_strategy_collapse(
     base_results: list[PromptResult],
     trained_results: list[PromptResult],
-    threshold: float = ENTROPY_DROP_THRESHOLD,
+    threshold: float = 0.3,
+    dominant_fraction_threshold: float = 0.6,
 ) -> StrategyCollapseResult:
     """Detect if post-training collapsed solution strategies.
 
@@ -41,7 +48,11 @@ def detect_strategy_collapse(
 
     # Find dominant strategy in trained model
     trained_counts = Counter(trained_strategies)
-    dominant = trained_counts.most_common(1)[0] if trained_counts else (ReasoningStrategy.UNKNOWN, 0)
+    dominant = (
+        trained_counts.most_common(1)[0]
+        if trained_counts
+        else (ReasoningStrategy.UNKNOWN, 0)
+    )
     dominant_strategy = dominant[0].value
     dominant_fraction = dominant[1] / len(trained_strategies) if trained_strategies else 0.0
 
@@ -57,7 +68,7 @@ def detect_strategy_collapse(
     else:
         score = 0.0  # Entropy increased = more diverse
 
-    is_flagged = entropy_drop > threshold and dominant_fraction > 0.6
+    is_flagged = entropy_drop > threshold and dominant_fraction > dominant_fraction_threshold
 
     if is_flagged:
         detail = (
@@ -72,6 +83,22 @@ def detect_strategy_collapse(
             f"No significant strategy collapse detected."
         )
 
+    # Bootstrap CI for entropy drop
+    ci_entropy = None
+    if len(trained_strategies) >= 3:
+        # Bootstrap: resample trained strategies, compute entropy_drop for each
+        rng = np.random.default_rng(42)
+        n_boot = 1000
+        boot_drops = np.empty(n_boot)
+        strat_indices = np.arange(len(trained_strategies))
+        for i in range(n_boot):
+            sample_idx = rng.choice(strat_indices, size=len(trained_strategies), replace=True)
+            boot_strats = [trained_strategies[j] for j in sample_idx]
+            boot_drops[i] = base_entropy - _compute_entropy(boot_strats)
+        lo = float(np.percentile(boot_drops, 2.5))
+        hi = float(np.percentile(boot_drops, 97.5))
+        ci_entropy = ConfidenceInterval(lower=round(lo, 6), upper=round(hi, 6))
+
     return StrategyCollapseResult(
         score=min(score, 100.0),
         base_entropy=base_entropy,
@@ -80,6 +107,7 @@ def detect_strategy_collapse(
         dominant_strategy=dominant_strategy,
         is_flagged=is_flagged,
         detail=detail,
+        entropy_drop_ci=ci_entropy,
     )
 
 

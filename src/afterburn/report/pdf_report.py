@@ -26,20 +26,20 @@ class PDFReport:
         """Generate PDF report file."""
         try:
             import weasyprint
-        except ImportError:
+        except ImportError as e:
             raise ReportGenerationError(
                 "PDF generation requires WeasyPrint. "
                 "Install it with: pip install afterburn[pdf]"
-            )
+            ) from e
 
         try:
             # First generate HTML
             html_report = HTMLReport(self.report)
             # Generate to a temp HTML string
+
             from jinja2 import Environment, FileSystemLoader
+
             from afterburn.report.html_report import TEMPLATE_DIR
-            from afterburn.version import __version__
-            from datetime import datetime
 
             env = Environment(
                 loader=FileSystemLoader(str(TEMPLATE_DIR)),

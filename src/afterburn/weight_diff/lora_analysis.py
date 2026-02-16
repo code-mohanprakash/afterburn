@@ -53,7 +53,7 @@ def analyze_lora_adapter(lora: LoRAWeights) -> dict[str, Any]:
 def _extract_layer_name(key: str) -> str:
     """Extract a logical layer name from a LoRA parameter key."""
     parts = key.split(".")
-    for i, part in enumerate(parts):
+    for _i, part in enumerate(parts):
         if part.isdigit():
             return f"layer_{part}"
     return "unknown"

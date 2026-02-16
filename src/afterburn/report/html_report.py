@@ -72,7 +72,7 @@ class HTMLReport:
         except Exception as e:
             raise ReportGenerationError(f"Failed to generate HTML report: {e}") from e
 
-    def _build_context(self, styles: str) -> dict:
+    def _build_context(self, styles: str) -> dict[str, object]:
         """Build the template context with all charts and data."""
         context = {
             "report": self.report,

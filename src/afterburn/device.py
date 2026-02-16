@@ -2,13 +2,75 @@
 
 from __future__ import annotations
 
+import atexit
 import logging
 import platform
+import shutil
+import signal
+import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 
+from afterburn.exceptions import OutOfMemoryError
+
 logger = logging.getLogger(__name__)
+
+# Cleanup registry for graceful shutdown
+_cleanup_callbacks: list[Callable[[], None]] = []
+
+
+def register_cleanup(callback: Callable[[], None]) -> None:
+    """Register a cleanup callback for graceful shutdown."""
+    _cleanup_callbacks.append(callback)
+
+
+def _cleanup_handler(signum: object = None, frame: object = None) -> None:
+    """Run all cleanup callbacks."""
+    import contextlib
+
+    for cb in _cleanup_callbacks:
+        with contextlib.suppress(Exception):
+            cb()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+# Register at module load
+atexit.register(_cleanup_handler)
+
+
+def _sigint_handler(s: object, f: object) -> None:
+    _cleanup_handler(s, f)
+
+
+signal.signal(signal.SIGINT, _sigint_handler)
+
+
+def check_disk_space(path: Path, required_gb: float) -> None:
+    """Check if sufficient disk space is available.
+
+    Raises OutOfMemoryError if insufficient space.
+    """
+    try:
+        usage = shutil.disk_usage(path)
+        available_gb = usage.free / (1024**3)
+
+        if available_gb < required_gb:
+            raise OutOfMemoryError(
+                f"Insufficient disk space at {path}: "
+                f"required {required_gb:.2f} GB, available {available_gb:.2f} GB"
+            )
+
+        logger.debug(
+            "Disk space check passed: %.2f GB available (%.2f GB required)",
+            available_gb,
+            required_gb,
+        )
+    except OSError as e:
+        raise OutOfMemoryError(f"Failed to check disk space at {path}: {e}") from e
 
 
 @dataclass
@@ -59,7 +121,7 @@ def auto_detect_device(
 def _build_config(device_type: str, max_memory_fraction: float) -> DeviceConfig:
     if device_type == "cuda":
         props = torch.cuda.get_device_properties(0)
-        total_gb = props.total_mem / (1024**3)
+        total_gb = props.total_memory / (1024**3)
         max_gb = total_gb * max_memory_fraction
         gpu_name = props.name
         dtype = torch.float16
@@ -96,11 +158,15 @@ def _build_config(device_type: str, max_memory_fraction: float) -> DeviceConfig:
 
         total_gb = psutil.virtual_memory().total / (1024**3)
     except ImportError:
-        import os
-
         # Fallback for systems without psutil
         if platform.system() == "Darwin":
-            total_gb = int(os.popen("sysctl -n hw.memsize").read().strip()) / (1024**3)
+            result = subprocess.run(
+                ["sysctl", "-n", "hw.memsize"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            total_gb = int(result.stdout.strip()) / (1024**3)
         else:
             with open("/proc/meminfo") as f:
                 for line in f:

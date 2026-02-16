@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from afterburn.exceptions import PromptSuiteError
-from afterburn.prompts.suite import PromptSuite, BUILTIN_SUITES
+from afterburn.prompts.suite import BUILTIN_SUITES, PromptSuite
 
 
 class TestPromptSuite:

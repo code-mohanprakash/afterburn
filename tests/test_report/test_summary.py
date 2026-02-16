@@ -1,14 +1,11 @@
 """Tests for summary and recommendation generation."""
 
-import pytest
 
 from afterburn.report.summary import generate_recommendations, generate_summary
 from afterburn.types import (
     DiagnosticReport,
-    EmbeddingDrift,
     ModelPair,
     TrainingMethod,
-    WeightDiffResult,
 )
 
 

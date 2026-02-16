@@ -1,12 +1,11 @@
 """Tests for the weight diff engine."""
 
-import pytest
+
+import torch
 
 from afterburn.device import DeviceConfig
 from afterburn.types import ModelPair
 from afterburn.weight_diff.engine import WeightDiffEngine
-
-import torch
 
 
 class TestWeightDiffEngine:

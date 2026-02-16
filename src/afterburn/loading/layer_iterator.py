@@ -6,13 +6,12 @@ import json
 import logging
 import re
 from collections import defaultdict
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import torch
 from safetensors import safe_open
 
-from afterburn.exceptions import ModelLoadError
 from afterburn.loading.checkpoint import CheckpointInfo, detect_checkpoint
 
 logger = logging.getLogger(__name__)
@@ -32,11 +31,11 @@ class LayerIterator:
     def __init__(
         self,
         model_id: str,
-        device: torch.device = torch.device("cpu"),
+        device: torch.device | None = None,
         dtype: torch.dtype = torch.float32,
     ):
         self.model_id = model_id
-        self.device = device
+        self.device = device if device is not None else torch.device("cpu")
         self.dtype = dtype
         self._checkpoint = detect_checkpoint(model_id)
         self._layer_map = self._build_layer_map()
@@ -98,7 +97,7 @@ class LayerIterator:
         """Get parameter keys from safetensors files."""
         keys = []
         for wf in self._checkpoint.weight_files:
-            with safe_open(str(wf), framework="pt", device="cpu") as f:
+            with safe_open(str(wf), framework="pt", device="cpu") as f:  # type: ignore[no-untyped-call]
                 keys.extend(f.keys())
         return keys
 
@@ -136,7 +135,7 @@ class LayerIterator:
                     logger.warning("Parameter '%s' not found in any weight file", key)
                     continue
                 wf = key_to_file[key]
-                with safe_open(str(wf), framework="pt", device=str(self.device)) as f:
+                with safe_open(str(wf), framework="pt", device=str(self.device)) as f:  # type: ignore[no-untyped-call]
                     tensor = f.get_tensor(key)
                     if tensor.dtype != self.dtype:
                         tensor = tensor.to(self.dtype)
@@ -170,8 +169,8 @@ class LayerIterator:
         # No index file — scan all files
         key_to_file: dict[str, Path] = {}
         for wf in self._checkpoint.weight_files:
-            with safe_open(str(wf), framework="pt", device="cpu") as f:
-                for key in f.keys():
+            with safe_open(str(wf), framework="pt", device="cpu") as f:  # type: ignore[no-untyped-call]
+                for key in f.keys():  # type: ignore[attr-defined]  # noqa: SIM118
                     key_to_file[key] = wf
         return key_to_file
 

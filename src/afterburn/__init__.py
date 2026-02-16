@@ -1,16 +1,18 @@
 """Afterburn: Post-training diagnostics for LLMs."""
 
-from afterburn.version import __version__
 from afterburn.diagnoser import Diagnoser
 from afterburn.types import (
+    ConfidenceInterval,
     DiagnosticReport,
     ModelPair,
-    TrainingMethod,
     ReportFormat,
+    TrainingMethod,
 )
+from afterburn.version import __version__
 
 __all__ = [
     "__version__",
+    "ConfidenceInterval",
     "Diagnoser",
     "DiagnosticReport",
     "ModelPair",

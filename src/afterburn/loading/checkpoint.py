@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import requests
 from huggingface_hub import snapshot_download
-from huggingface_hub.utils import HfHubHTTPError, RepositoryNotFoundError
+from huggingface_hub.utils import (  # type: ignore[attr-defined]
+    HfHubHTTPError,
+    RepositoryNotFoundError,
+)
 
-from afterburn.exceptions import ModelLoadError, ModelNotFoundError
+from afterburn.exceptions import ModelLoadError, ModelNotFoundError, PathValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +39,37 @@ class CheckpointInfo:
     vocab_size: int | None = None
 
 
+def _validate_path(path: Path) -> None:
+    """Validate that a path is safe and doesn't use directory traversal.
+
+    Args:
+        path: Path to validate.
+
+    Raises:
+        PathValidationError: If the path is unsafe or uses directory traversal.
+    """
+    try:
+        # Resolve to absolute path to catch symlinks and .. traversal
+        resolved = path.resolve()
+
+        # Check for suspicious patterns in the original path
+        path_str = str(path)
+        suspicious_patterns = ["/../", "/..", "\\..\\", "\\.."]
+
+        for pattern in suspicious_patterns:
+            if pattern in path_str:
+                raise PathValidationError(
+                    f"Path contains directory traversal pattern: {path}"
+                )
+
+        # Ensure the resolved path is an absolute path
+        if not resolved.is_absolute():
+            raise PathValidationError(f"Path must be absolute: {path}")
+
+    except (OSError, RuntimeError) as e:
+        raise PathValidationError(f"Invalid path: {path}. Error: {e}") from e
+
+
 def detect_checkpoint(model_id: str) -> CheckpointInfo:
     """Detect checkpoint format and resolve model path.
 
@@ -43,7 +79,17 @@ def detect_checkpoint(model_id: str) -> CheckpointInfo:
     local_path = Path(model_id)
 
     if local_path.is_dir():
+        _validate_path(local_path)
         return _inspect_local(local_path)
+
+    # If it looks like a local path (exists or is absolute) but is not a directory, fail
+    if local_path.exists():
+        raise ModelLoadError(f"Expected a directory, got a file: {local_path}")
+
+    # If it's an absolute path that doesn't exist, fail early
+    # (Don't try to download absolute paths from HuggingFace Hub)
+    if local_path.is_absolute():
+        raise ModelNotFoundError(f"Path does not exist: {local_path}")
 
     # Try HuggingFace Hub
     return _download_and_inspect(model_id)
@@ -51,20 +97,71 @@ def detect_checkpoint(model_id: str) -> CheckpointInfo:
 
 def _download_and_inspect(model_id: str) -> CheckpointInfo:
     """Download a model from HuggingFace Hub and inspect it."""
-    try:
-        local_dir = snapshot_download(
-            model_id,
-            allow_patterns=["*.safetensors", "*.bin", "*.json", "*.model", "*.txt"],
-            ignore_patterns=["*.msgpack", "*.h5", "*.onnx", "optimizer*", "training_args*"],
-        )
-    except RepositoryNotFoundError:
-        raise ModelNotFoundError(
-            f"Model '{model_id}' not found on HuggingFace Hub or as a local path."
-        )
-    except HfHubHTTPError as e:
-        raise ModelLoadError(f"Failed to download '{model_id}': {e}") from e
+    max_retries = 3
+    backoff_seconds = [1, 2, 4]  # Exponential backoff
 
-    return _inspect_local(Path(local_dir))
+    for attempt in range(max_retries):
+        try:
+            local_dir = snapshot_download(
+                model_id,
+                allow_patterns=["*.safetensors", "*.bin", "*.json", "*.model", "*.txt"],
+                ignore_patterns=["*.msgpack", "*.h5", "*.onnx", "optimizer*", "training_args*"],
+            )
+            return _inspect_local(Path(local_dir))
+
+        except RepositoryNotFoundError as e:
+            # Don't retry on permanent errors
+            raise ModelNotFoundError(
+                f"Model '{model_id}' not found on HuggingFace Hub or as a local path."
+            ) from e
+
+        except HfHubHTTPError as e:
+            # Check HfHubHTTPError BEFORE RequestException (since it inherits from it)
+            # Retry on 5xx errors (server issues), but not 4xx (client errors)
+            should_retry = False
+            if hasattr(e, "response") and e.response is not None:
+                status_code = e.response.status_code
+                if 500 <= status_code < 600 and attempt < max_retries - 1:
+                    should_retry = True
+                    wait_time = backoff_seconds[attempt]
+                    logger.warning(
+                        "Server error %d downloading '%s' (attempt %d/%d). Retrying in %ds...",
+                        status_code,
+                        model_id,
+                        attempt + 1,
+                        max_retries,
+                        wait_time,
+                    )
+                    time.sleep(wait_time)
+
+            if not should_retry:
+                # Don't retry on client errors or final attempt
+                raise ModelLoadError(f"Failed to download '{model_id}': {e}") from e
+
+        except (
+            ConnectionError,
+            TimeoutError,
+            requests.exceptions.RequestException,
+        ) as e:
+            # Retry on transient network errors
+            if attempt < max_retries - 1:
+                wait_time = backoff_seconds[attempt]
+                logger.warning(
+                    "Download failed for '%s' (attempt %d/%d): %s. Retrying in %ds...",
+                    model_id,
+                    attempt + 1,
+                    max_retries,
+                    e,
+                    wait_time,
+                )
+                time.sleep(wait_time)
+            else:
+                raise ModelLoadError(
+                    f"Failed to download '{model_id}' after {max_retries} attempts: {e}"
+                ) from e
+
+    # This should never be reached, but for safety
+    raise ModelLoadError(f"Failed to download '{model_id}' after {max_retries} attempts")
 
 
 def _inspect_local(path: Path) -> CheckpointInfo:
@@ -115,7 +212,10 @@ def _inspect_local(path: Path) -> CheckpointInfo:
             break
 
     # Check for LoRA adapter
-    has_lora = (path / "adapter_config.json").exists() or (path / "adapter_model.safetensors").exists()
+    has_lora = (
+        (path / "adapter_config.json").exists()
+        or (path / "adapter_model.safetensors").exists()
+    )
 
     info = CheckpointInfo(
         local_path=path,

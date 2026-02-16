@@ -8,6 +8,19 @@ from pathlib import Path
 from typing import Any
 
 
+@dataclass(frozen=True)
+class ConfidenceInterval:
+    """A confidence interval with lower/upper bounds and confidence level."""
+
+    lower: float
+    upper: float
+    confidence: float = 0.95
+
+    @property
+    def width(self) -> float:
+        return self.upper - self.lower
+
+
 class TrainingMethod(Enum):
     SFT = "sft"
     DPO = "dpo"
@@ -76,6 +89,11 @@ class LayerDiff:
     spectral_alpha: float | None = None
     spectral_alpha_quality: str | None = None
     spectral_stable_rank: float | None = None
+    # Marchenko-Pastur law comparison
+    mp_sigma_sq: float | None = None
+    mp_num_spikes: int | None = None
+    mp_bulk_fraction: float | None = None
+    mp_kl_divergence: float | None = None
 
 
 @dataclass(frozen=True)
@@ -110,6 +128,15 @@ class EmbeddingDrift:
     output_embedding_l2: float | None
     output_embedding_cosine: float | None
     top_drifted_tokens: list[tuple[int, float]]
+
+
+@dataclass(frozen=True)
+class BehavioralVector:
+    """A principal direction of change extracted from weight diff SVD."""
+    layer_name: str
+    singular_value: float
+    direction_index: int          # 0 = top, 1 = second, etc.
+    explained_variance_ratio: float  # SV^2 / sum(SV^2)
 
 
 # ─── Prompt Types ────────────────────────────────────────────────────
@@ -165,6 +192,9 @@ class LengthAnalysis:
     trained_kurtosis: float = 0.0
     base_percentiles: dict[str, float] = field(default_factory=dict)
     trained_percentiles: dict[str, float] = field(default_factory=dict)
+    cohens_d_ci: ConfidenceInterval | None = None
+    mean_diff_ci: ConfidenceInterval | None = None
+    corrected_p_value: float | None = None
 
 
 @dataclass
@@ -247,6 +277,8 @@ class LengthBiasResult:
     is_flagged: bool
     detail: str = ""
     per_category: dict[str, dict[str, float]] = field(default_factory=dict)
+    cohens_d_ci: ConfidenceInterval | None = None
+    corrected_p_value: float | None = None
 
 
 @dataclass
@@ -270,6 +302,7 @@ class StrategyCollapseResult:
     dominant_strategy: str = ""
     is_flagged: bool = False
     detail: str = ""
+    entropy_drop_ci: ConfidenceInterval | None = None
 
 
 @dataclass
@@ -285,6 +318,10 @@ class SycophancyResult:
     base_pushback_rate: float = 0.0
     trained_pushback_rate: float = 0.0
     persuasion_resistance_drop: float = 0.0
+    num_probes_used: int = 0
+    per_domain_consistency: dict[str, float] = field(default_factory=dict)
+    agreement_rate_ci: ConfidenceInterval | None = None
+    pushback_rate_ci: ConfidenceInterval | None = None
 
 
 # ─── Aggregate Result Types ──────────────────────────────────────────
@@ -301,6 +338,8 @@ class WeightDiffResult:
     lora_analysis: dict[str, Any] | None
     total_param_count: int
     changed_param_count: int
+    behavioral_vectors: list[BehavioralVector] = field(default_factory=list)
+    direction_coherence: float = 0.0
 
     @property
     def top_changed_layers(self) -> list[LayerDiff]:
@@ -321,12 +360,13 @@ class WeightDiffResult:
 class TokenDivergenceAnalysis:
     """Token-level probability divergence between base and trained models."""
 
-    mean_kl_divergence: float = 0.0
-    per_prompt_kl: list[float] = field(default_factory=list)
+    mean_jsd: float = 0.0
+    per_prompt_jsd: list[float] = field(default_factory=list)
     top_divergent_prompts: list[tuple[str, float]] = field(default_factory=list)
     per_category: dict[str, float] = field(default_factory=dict)
     has_token_probs: bool = False
     num_prompts_analyzed: int = 0
+    mean_jsd_ci: ConfidenceInterval | None = None
 
 
 @dataclass

@@ -1,13 +1,21 @@
-"""Reasoning strategy classification and shift analysis."""
+"""Reasoning strategy classification and shift analysis.
+
+Uses NLI-based zero-shot classification when available (more accurate),
+with regex-based pattern matching as a fast fallback.
+"""
 
 from __future__ import annotations
 
+import logging
 import math
 import re
 from collections import Counter
 from dataclasses import dataclass
 
+from afterburn.nli import is_nli_available, zero_shot_classify
 from afterburn.types import PromptResult, ReasoningStrategy, StrategyShiftAnalysis
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -65,17 +73,34 @@ def _count_matches(text: str, patterns: list[str], flags: int = 0) -> int:
 # ─── Public API ─────────────────────────────────────────────────────
 
 
+# NLI label → ReasoningStrategy mapping
+_NLI_STRATEGY_LABELS = {
+    "step by step reasoning": ReasoningStrategy.STEP_BY_STEP,
+    "code-based solution": ReasoningStrategy.CODE_ASSISTED,
+    "direct answer without explanation": ReasoningStrategy.DIRECT_ANSWER,
+    "chain of thought reasoning": ReasoningStrategy.CHAIN_OF_THOUGHT,
+    "tool usage and command execution": ReasoningStrategy.TOOL_USE,
+}
+
+
 def classify_reasoning_strategy(output: str) -> ReasoningStrategy:
     """Classify the reasoning strategy used in a model output.
 
-    Priority-based: tool_use > code_assisted > step_by_step > cot > direct.
-    Each strategy must meet a minimum match threshold to qualify.
+    Uses regex patterns as primary classifier (tuned for LLM output patterns),
+    with NLI as a tiebreaker for ambiguous cases where regex defaults to
+    chain_of_thought without strong evidence.
     """
     return classify_reasoning_strategy_detailed(output).strategy
 
 
 def classify_reasoning_strategy_detailed(output: str) -> ClassificationResult:
-    """Classify with match counts for each strategy."""
+    """Classify with confidence scores for each strategy.
+
+    Regex-first approach:
+    1. Always run regex classification (fast, tuned for LLM patterns)
+    2. If regex defaults to chain_of_thought with no strong signals, try NLI
+    3. NLI provides a second opinion for ambiguous cases only
+    """
     if not output.strip():
         return ClassificationResult(
             strategy=ReasoningStrategy.UNKNOWN,
@@ -83,7 +108,64 @@ def classify_reasoning_strategy_detailed(output: str) -> ClassificationResult:
             scores={s.value: 0.0 for s in ReasoningStrategy},
         )
 
-    # Count matches for each strategy
+    # Always run regex first (tuned for specific LLM output patterns)
+    regex_result = _classify_regex(output)
+
+    # If regex had clear signals, use it directly
+    if regex_result.confidence > 0.6 or regex_result.strategy != ReasoningStrategy.CHAIN_OF_THOUGHT:
+        return regex_result
+
+    # For ambiguous cases (low confidence CoT default), try NLI
+    if is_nli_available():
+        nli_result = _classify_nli(output)
+        if nli_result is not None and nli_result.confidence > regex_result.confidence:
+            return nli_result
+
+    return regex_result
+
+
+def _classify_nli(output: str) -> ClassificationResult | None:
+    """Classify reasoning strategy using NLI zero-shot classification."""
+    # Truncate long outputs for NLI (first 512 chars captures strategy)
+    truncated = output[:512] if len(output) > 512 else output
+
+    scores = zero_shot_classify(
+        truncated,
+        list(_NLI_STRATEGY_LABELS.keys()),
+        hypothesis_template="This text uses {}.",
+    )
+
+    if scores is None:
+        return None
+
+    # Map NLI labels to ReasoningStrategy
+    strategy_scores: dict[str, float] = {}
+    best_label = ""
+    best_score = 0.0
+
+    for label, score in scores.items():
+        strategy = _NLI_STRATEGY_LABELS[label]
+        strategy_scores[strategy.value] = score
+        if score > best_score:
+            best_score = score
+            best_label = label
+
+    # Fill missing strategies with 0
+    for s in ReasoningStrategy:
+        if s.value not in strategy_scores:
+            strategy_scores[s.value] = 0.0
+
+    strategy = _NLI_STRATEGY_LABELS[best_label]
+
+    return ClassificationResult(
+        strategy=strategy,
+        confidence=best_score,
+        scores=strategy_scores,
+    )
+
+
+def _classify_regex(output: str) -> ClassificationResult:
+    """Classify reasoning strategy using regex pattern matching (fallback)."""
     tool = _count_matches(output, _TOOL_PATTERNS, re.MULTILINE | re.IGNORECASE)
     code = _count_matches(output, _CODE_PATTERNS, re.MULTILINE)
     step = _count_matches(output, _STEP_PATTERNS, re.MULTILINE | re.IGNORECASE)
@@ -99,7 +181,6 @@ def classify_reasoning_strategy_detailed(output: str) -> ClassificationResult:
         "unknown": 0.0,
     }
 
-    # Priority-based classification with minimum thresholds
     if tool >= 2:
         strategy = ReasoningStrategy.TOOL_USE
     elif code >= 3:
@@ -112,16 +193,11 @@ def classify_reasoning_strategy_detailed(output: str) -> ClassificationResult:
         strategy = ReasoningStrategy.DIRECT_ANSWER
         scores["direct_answer"] = 1.0
     else:
-        # Long text with no clear signals → chain of thought by default
         strategy = ReasoningStrategy.CHAIN_OF_THOUGHT
 
-    # Confidence: how dominant is the top signal vs others?
     top = scores.get(strategy.value, 1.0)
     others = [v for k, v in scores.items() if k != strategy.value and v > 0]
-    if top > 0 and others:
-        confidence = 1.0 - (max(others) / (top + max(others)))
-    else:
-        confidence = 1.0
+    confidence = 1.0 - max(others) / (top + max(others)) if top > 0 and others else 1.0
 
     return ClassificationResult(
         strategy=strategy,

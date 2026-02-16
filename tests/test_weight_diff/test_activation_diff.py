@@ -4,7 +4,6 @@ import pytest
 import torch
 
 from afterburn.weight_diff.activation_diff import (
-    ActivationDiffResult,
     DimensionShift,
     compute_activation_diff,
 )

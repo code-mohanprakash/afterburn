@@ -1,6 +1,5 @@
 """Tests for length bias detection (Phase 2 enhancements)."""
 
-import pytest
 
 from afterburn.reward_hack.length_bias import detect_length_bias
 from afterburn.types import PromptResult

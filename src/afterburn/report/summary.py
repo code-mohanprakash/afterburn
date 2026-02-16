@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from afterburn.config import ReportConfig
 from afterburn.types import DiagnosticReport, RiskLevel
 
 
-def generate_summary(report: DiagnosticReport) -> str:
+def generate_summary(
+    report: DiagnosticReport,
+    config: ReportConfig | None = None,
+) -> str:
     """Generate a plain-English executive summary of the diagnostic report."""
+    cfg = config or ReportConfig()
     parts: list[str] = []
 
     parts.append(
@@ -29,7 +34,7 @@ def generate_summary(report: DiagnosticReport) -> str:
             )
 
             concentration = wd.change_concentration
-            if concentration > 0.5:
+            if concentration > cfg.concentration_threshold:
                 parts.append(
                     f"Changes are highly concentrated — the top 5 layers account for "
                     f"{concentration:.0%} of total weight change."
@@ -72,13 +77,17 @@ def generate_summary(report: DiagnosticReport) -> str:
     return " ".join(parts)
 
 
-def generate_recommendations(report: DiagnosticReport) -> list[str]:
+def generate_recommendations(
+    report: DiagnosticReport,
+    config: ReportConfig | None = None,
+) -> list[str]:
     """Generate actionable recommendations based on findings."""
+    cfg = config or ReportConfig()
     recommendations: list[str] = []
 
     if report.weight_diff:
         wd = report.weight_diff
-        if wd.change_concentration > 0.7:
+        if wd.change_concentration > cfg.high_concentration_threshold:
             recommendations.append(
                 "Weight changes are highly concentrated in a few layers. "
                 "Consider whether this indicates overfitting to specific patterns. "
@@ -86,7 +95,7 @@ def generate_recommendations(report: DiagnosticReport) -> list[str]:
             )
 
         significant_norms = [s for s in wd.layernorm_shifts if s.is_significant]
-        if len(significant_norms) > wd.total_param_count * 0.5 / max(len(wd.layer_diffs), 1):
+        if len(significant_norms) > len(wd.layer_diffs) * cfg.layernorm_fraction_threshold:
             recommendations.append(
                 "Many LayerNorm parameters show significant shifts. "
                 "This can indicate aggressive training — consider reducing epochs or learning rate."
@@ -94,19 +103,19 @@ def generate_recommendations(report: DiagnosticReport) -> list[str]:
 
     if report.behaviour:
         bh = report.behaviour
-        if bh.length_analysis.is_significant and bh.length_analysis.cohens_d > 0.8:
+        if bh.length_analysis.is_significant and bh.length_analysis.cohens_d > cfg.large_effect_size:
             recommendations.append(
                 "Output lengths changed dramatically. Check if your reward function "
                 "has a length bias — consider adding a length penalty."
             )
 
-        if bh.format_analysis.format_increase > 0.2:
+        if bh.format_analysis.format_increase > cfg.format_increase_concern:
             recommendations.append(
                 "Significant increase in format pattern usage. If using a format-based "
                 "verifier, ensure it validates correctness, not just format compliance."
             )
 
-        if bh.strategy_analysis.entropy_change < -0.3:
+        if bh.strategy_analysis.entropy_change < cfg.entropy_change_concern:
             recommendations.append(
                 "Reasoning strategy diversity decreased. The model may be converging "
                 "on a single approach. Try diversifying training examples or using "

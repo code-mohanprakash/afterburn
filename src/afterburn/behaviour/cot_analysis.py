@@ -53,11 +53,19 @@ def analyze_chain_of_thought(
     depth_change = trained_avg_depth - base_avg_depth
 
     # Calculate rates (proportion of responses with self-correction/verification)
-    base_self_correction_rate = float(np.mean(base_corrections)) if base_corrections else 0.0
-    trained_self_correction_rate = float(np.mean(trained_corrections)) if trained_corrections else 0.0
+    base_self_correction_rate = (
+        float(np.mean(base_corrections)) if base_corrections else 0.0
+    )
+    trained_self_correction_rate = (
+        float(np.mean(trained_corrections)) if trained_corrections else 0.0
+    )
 
-    base_verification_rate = float(np.mean(base_verifications)) if base_verifications else 0.0
-    trained_verification_rate = float(np.mean(trained_verifications)) if trained_verifications else 0.0
+    base_verification_rate = (
+        float(np.mean(base_verifications)) if base_verifications else 0.0
+    )
+    trained_verification_rate = (
+        float(np.mean(trained_verifications)) if trained_verifications else 0.0
+    )
 
     return ChainOfThoughtAnalysis(
         base_avg_steps=base_avg_steps,
@@ -88,14 +96,18 @@ def _count_reasoning_steps(text: str) -> int:
         (r"Step\s+\d+", 3.0),  # Explicit step numbering - highest weight
         (r"^\d+\.\s+\S", 2.5),  # Numbered list items at line start
         (r"^-\s+\S", 1.5),  # Bullet points at line start
-        (r"(?:First|Second|Third|Fourth|Fifth|Sixth|Seventh|Eighth|Ninth|Tenth)(?:ly)?[,:]?\s+", 2.0),
+        (
+            r"(?:First|Second|Third|Fourth|Fifth|Sixth|Seventh|Eighth|Ninth|Tenth)"
+            r"(?:ly)?[,:]?\s+",
+            2.0,
+        ),
         (r"(?:Then|Next|After that|Finally|Lastly)[,:]?\s+", 1.5),
         (r"(?:Therefore|Thus|Hence|Consequently)[,:]?\s+", 1.2),
         (r"(?:Now|At this point|Moving forward)[,:]?\s+", 1.0),
     ]
 
     # Track which parts of the text we've already counted
-    counted_positions = set()
+    counted_positions: set[int] = set()
     total_weighted_steps = 0.0
 
     for pattern, weight in weighted_patterns:
@@ -192,11 +204,7 @@ def _detect_self_correction(text: str) -> bool:
         r"\bRevising\s+(?:my|the)\s+(?:answer|approach)\b",
     ]
 
-    for pattern in correction_patterns:
-        if re.search(pattern, text, re.IGNORECASE):
-            return True
-
-    return False
+    return any(re.search(pattern, text, re.IGNORECASE) for pattern in correction_patterns)
 
 
 def _detect_verification(text: str) -> bool:
@@ -228,8 +236,4 @@ def _detect_verification(text: str) -> bool:
         r"\bReviewing\b",
     ]
 
-    for pattern in verification_patterns:
-        if re.search(pattern, text, re.IGNORECASE):
-            return True
-
-    return False
+    return any(re.search(pattern, text, re.IGNORECASE) for pattern in verification_patterns)

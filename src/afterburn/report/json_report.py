@@ -61,15 +61,15 @@ class JSONReport:
                 "change_concentration": wd.change_concentration,
                 "top_changed_layers": [
                     {
-                        "layer_name": l.layer_name,
-                        "layer_index": l.layer_index,
-                        "l2_norm": l.l2_norm,
-                        "cosine_similarity": l.cosine_similarity,
-                        "frobenius_norm": l.frobenius_norm,
-                        "relative_change": l.relative_change,
-                        "param_count": l.param_count,
+                        "layer_name": layer.layer_name,
+                        "layer_index": layer.layer_index,
+                        "l2_norm": layer.l2_norm,
+                        "cosine_similarity": layer.cosine_similarity,
+                        "frobenius_norm": layer.frobenius_norm,
+                        "relative_change": layer.relative_change,
+                        "param_count": layer.param_count,
                     }
-                    for l in wd.top_changed_layers
+                    for layer in wd.top_changed_layers
                 ],
                 "layernorm_shifts": [
                     {
@@ -161,8 +161,11 @@ class JSONReport:
 
 def _json_serializer(obj: Any) -> Any:
     """Custom JSON serializer for objects not serializable by default."""
-    if hasattr(obj, "value"):  # Enum
+    from dataclasses import is_dataclass
+    from enum import Enum
+
+    if isinstance(obj, Enum):
         return obj.value
-    if hasattr(obj, "__dataclass_fields__"):
+    if is_dataclass(obj) and not isinstance(obj, type):
         return asdict(obj)
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")

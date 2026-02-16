@@ -1,32 +1,123 @@
 # Afterburn
 
-**Post-training diagnostics for LLMs**
-
-> What did fine-tuning actually do to your model?
+**Post-training diagnostics for LLMs. Weight diffs, behavioral analysis, and reward hacking detection — before you deploy.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#status)
+[![Tests](https://img.shields.io/badge/tests-678%20passing-brightgreen.svg)](#)
+[![CI](https://github.com/code-mohanprakash/afterburn/actions/workflows/ci.yml/badge.svg)](https://github.com/code-mohanprakash/afterburn/actions)
 
 ---
 
-Afterburn is an open-source diagnostic tool that takes two model checkpoints (base + post-trained) and tells you exactly what changed — at the weight level, the behavioural level, and whether your model picked up reward hacking patterns along the way.
+Most evaluation tools tell you benchmark scores went up or down. Afterburn tells you **why** — by comparing two model checkpoints (base + post-trained) at the weight level, the behavioural level, and checking for reward hacking patterns.
 
-Most evaluation tools tell you benchmark scores went up or down. Afterburn tells you **why**.
-
-> **Alpha release — actively under development.** Core weight-diff analysis is functional and tested against real models. Behavioural analysis and reward hacking detection are implemented and unit-tested but pending end-to-end validation on larger hardware. See [Status](#status) for details.
+No other open-source tool combines all three.
 
 ## Quick Start
 
 ```bash
 pip install afterburn
 
-# Full diagnostic report
 afterburn diagnose \
   --base Qwen/Qwen2.5-0.5B \
   --trained Qwen/Qwen2.5-0.5B-Instruct \
   --method sft \
   -o report.html
+```
+
+```python
+from afterburn import Diagnoser
+
+report = Diagnoser(
+    base_model="Qwen/Qwen2.5-0.5B",
+    trained_model="Qwen/Qwen2.5-0.5B-Instruct",
+    method="sft",
+).run()
+
+print(report.summary)
+print(f"Reward hack risk: {report.hack_score:.0f}/100")
+report.save("report.html")
+```
+
+## What It Does
+
+### 1. Weight Diff Analysis
+Compares model weights layer-by-layer. Memory-efficient via safetensors memory mapping (~128MB peak per layer for 8B models).
+
+| Metric | What It Measures |
+|--------|-----------------|
+| L2 / Cosine / Frobenius | Magnitude and direction of weight changes |
+| SVD decomposition | Effective rank, concentration ratio, stable rank of the diff |
+| Spectral alpha | Power-law exponent of eigenvalue spectrum (2-4 = healthy) |
+| Marchenko-Pastur law | Compares eigenvalues to random matrix theory — spikes = learned structure |
+| Behavioral vectors | Principal directions of change via SVD, cross-layer coherence |
+| Attention head importance | Per-head importance delta before vs after training |
+| LayerNorm shift | Gamma/beta parameter drift detection |
+| Embedding drift | Token embedding movement, most-drifted tokens |
+| LoRA analysis | Adapter weight decomposition and impact (auto-detected) |
+
+### 2. Behavioral Shift Detection
+Runs the same prompts through both models, compares outputs statistically.
+
+- **Length distribution** — Mann-Whitney U test, Cohen's d, skewness, kurtosis, percentiles
+- **Reasoning strategy** — Classification (direct, step-by-step, code-assisted, CoT, tool use) with NLI tiebreaker
+- **Strategy shift** — Detects if training collapsed diverse strategies into one
+- **Format compliance** — Code blocks, LaTeX, markdown, tables, thinking tags (Shannon entropy)
+- **Chain-of-thought** — Step counting, depth, self-correction rate, verification patterns
+- **Diversity** — EAD (Expectation-Adjusted Distinct n-grams), optional SBERT semantic diversity
+- **Token divergence** — Jensen-Shannon Divergence on token probability distributions
+- **Calibration** — Expected Calibration Error (ECE), reliability diagrams
+
+### 3. Reward Hacking Detection
+Detects failure modes from RLHF/DPO/GRPO training. Composite risk score 0-100.
+
+| Detector | What It Catches |
+|----------|----------------|
+| **Length bias** | Outputs got longer without quality gains (Cohen's d) |
+| **Format gaming** | Model exploits format-based reward signals (ROUGE-L correctness correlation) |
+| **Strategy collapse** | Model converges on one strategy, losing diversity (Shannon entropy) |
+| **Sycophancy** | Model agrees more post-training, even with false claims |
+
+Sycophancy detection uses three methods:
+1. Regex-based agreement/pushback rate comparison
+2. NLI-enhanced semantic agreement detection (`cross-encoder/nli-deberta-v3-small`)
+3. **40 adversarial consistency probes** across math, science, history, and coding — neutral vs leading prompt pairs that test if the model changes factual answers under pressure
+
+### 4. Reports
+- Interactive HTML with Plotly visualizations
+- JSON structured output for pipelines
+- Markdown for documentation
+- PDF (optional dependency)
+- Executive summary + actionable recommendations
+
+## Installation
+
+```bash
+# From PyPI
+pip install afterburn
+
+# From source
+git clone https://github.com/code-mohanprakash/afterburn.git
+cd afterburn
+pip install -e ".[dev]"
+
+# Optional: NLI-enhanced analysis
+pip install afterburn[nli]
+
+# Optional: PDF export
+pip install afterburn[pdf]
+
+# Optional: Semantic diversity (SBERT)
+pip install afterburn[semantic]
+```
+
+**Requirements:** Python 3.10+, PyTorch 2.0+. GPU recommended but not required (CUDA, MPS, CPU).
+
+## CLI
+
+```bash
+# Full diagnostic
+afterburn diagnose --base <model> --trained <model> -o report.html
 
 # Individual analyses
 afterburn weight-diff --base <model> --trained <model> -o weights.json
@@ -40,111 +131,34 @@ afterburn hack-check --base <model> --trained <model> -o hacking.json
 from afterburn import Diagnoser
 
 diag = Diagnoser(
-    base_model="Qwen/Qwen2.5-0.5B",
-    trained_model="Qwen/Qwen2.5-0.5B-Instruct",
-    method="sft",
+    base_model="meta-llama/Llama-3.1-8B",
+    trained_model="my-org/Llama-3.1-8B-RLVR",
+    method="rlvr",
 )
 
+# Full analysis
 report = diag.run()
-print(report.summary)
-report.save("report.html")
+
+# Or individual modules
+weight_diff = diag.run_weight_diff()
+behaviour = diag.run_behaviour()
+hack_check = diag.run_hack_check()
+
+# Inspect results
+for layer in weight_diff.top_changed_layers:
+    print(f"{layer.layer_name}: relative_change={layer.relative_change:.4f}")
+    if layer.mp_num_spikes is not None:
+        print(f"  MP spikes: {layer.mp_num_spikes} (bulk: {layer.mp_bulk_fraction:.1%})")
+
+print(f"Direction coherence: {weight_diff.direction_coherence:.3f}")
 ```
-
-Or use individual modules directly:
-
-```python
-from afterburn.weight_diff.engine import WeightDiffEngine
-from afterburn.device import auto_detect_device
-from afterburn.types import ModelPair
-
-pair = ModelPair(base_model="Qwen/Qwen2.5-0.5B", trained_model="Qwen/Qwen2.5-0.5B-Instruct")
-device = auto_detect_device()
-
-engine = WeightDiffEngine(pair, device)
-result = engine.run()
-
-for layer in result.top_changed_layers[:5]:
-    print(f"{layer.layer_name}: L2={layer.l2_norm:.4f}, cosine={layer.cosine_similarity:.6f}")
-```
-
-## What It Analyzes
-
-### Weight Diff Analysis
-Compares model weights layer-by-layer without running inference. Memory-efficient via safetensors memory mapping.
-
-- L2 norm, cosine similarity, Frobenius norm per layer
-- Attention head importance ranking (before vs after)
-- LayerNorm gamma/beta shift detection
-- Embedding layer drift measurement
-- LoRA adapter decomposition analysis
-- Change concentration metrics (how spread out are the changes?)
-
-### Behavioural Shift Detection
-Runs the same prompts through both models and compares outputs statistically.
-
-- Output length distribution changes (Mann-Whitney U, Cohen's d)
-- Reasoning strategy classification (direct, step-by-step, code-assisted, chain-of-thought, tool use)
-- Strategy shift detection (did training collapse diverse strategies into one?)
-- Format compliance analysis (code blocks, LaTeX, markdown, tables, thinking tags)
-- Chain-of-thought depth, self-correction, and verification patterns
-- Per-category breakdowns (math, code, reasoning, safety)
-
-### Reward Hacking Detection
-Detects common failure modes from RLHF/DPO/GRPO training.
-
-- **Length bias** — Outputs got systematically longer without quality gains
-- **Format gaming** — Model exploits format-based reward signals (e.g. always wrapping in code blocks)
-- **Strategy collapse** — Model converges on a single solution strategy, losing diversity
-- **Sycophancy** — Model agrees more after alignment, even when it shouldn't
-- **Composite risk score** (0-100) with LOW / MODERATE / HIGH / CRITICAL thresholds
-
-### Diagnostic Reports
-- Interactive HTML reports with Plotly visualizations
-- JSON structured output for pipelines
-- Markdown for documentation
-- PDF export (optional dependency)
-- Executive summary with plain-English findings
-- Actionable recommendations
-
-## Supported Training Methods
-
-| Method | Analysis Focus |
-|--------|---------------|
-| SFT | Task-specific patterns, format compliance changes |
-| DPO | Preference shifts, sycophancy risk, style changes |
-| RLHF | Reward model exploitation, policy divergence |
-| RLVR | Genuine reasoning improvement vs formatting tricks |
-| GRPO | Policy evolution, verifier gaming |
-| LoRA/QLoRA | Adapter weight impact on base model behaviour |
-
-## Installation
-
-```bash
-# From source (recommended during alpha)
-git clone https://github.com/code-mohanprakash/afterburn.git
-cd afterburn
-pip install -e .
-
-# With PDF export
-pip install -e ".[pdf]"
-
-# With dev tools (pytest, ruff, mypy)
-pip install -e ".[dev]"
-```
-
-### Requirements
-
-- Python 3.10+
-- PyTorch 2.0+
-- ~4GB free disk space for small models (0.5B), more for larger models
-- GPU recommended but not required (supports CUDA, MPS, CPU)
 
 ## Configuration
 
-Optional `.afterburn.yaml` in your project root:
+Optional `.afterburn.yaml`:
 
 ```yaml
-device: auto          # auto | cuda | mps | cpu
+device: auto
 behaviour:
   suites: [math, code, reasoning, safety]
   max_new_tokens: 512
@@ -157,105 +171,68 @@ reward_hack:
     sycophancy: 0.25
 ```
 
-## Custom Prompt Suites
+## How It Works
 
-```yaml
-name: "my-domain"
-category: "custom"
-prompts:
-  - id: "q1"
-    text: "Explain quantum entanglement"
-    expected_answer: "..."
-    difficulty: "hard"
-    tags: ["physics"]
+```
+Base Model ──┐
+             ├── Weight Diff (safetensors, one layer at a time)
+Trained Model┘           │
+                         ├── Diagnostic Report
+Base Model ──┐           │   (HTML / JSON / MD / PDF)
+             ├── Prompt Runner (one model at a time)
+Trained Model┘           │
+                         ├── Behaviour Analysis (statistical comparison)
+                         │
+                         └── Reward Hack Detection (40 adversarial probes)
 ```
 
-```bash
-afterburn diagnose --suites my-suite.yaml
-```
+1. **Weight diff** loads both checkpoints via memory-mapped safetensors and computes per-layer metrics including SVD, spectral analysis, and Marchenko-Pastur law fitting
+2. **Prompt runner** generates outputs from both models on standardized prompt suites (loads one model at a time to halve memory)
+3. **Behaviour analyser** compares output distributions with statistical tests (Mann-Whitney U, Cohen's d, JSD, EAD)
+4. **Reward hack detector** runs 4 sub-detectors + 40 adversarial consistency probes with NLI-enhanced scoring
+5. **Report generator** compiles everything into a human-readable diagnostic with Plotly visualizations
 
 ## Project Structure
 
 ```
 src/afterburn/
-├── cli/                 # Click CLI commands
-├── loading/             # Model loading, safetensors, LoRA
-├── weight_diff/         # Layer-by-layer weight comparison
-├── behaviour/           # Behavioural shift analysis
-├── reward_hack/         # Reward hacking detection
-├── prompts/             # Prompt suites + inference runner
-├── report/              # HTML/JSON/MD/PDF report generation
-├── diagnoser.py         # Top-level orchestrator
-└── types.py             # Shared dataclasses and enums
+├── cli/            # Click CLI commands
+├── loading/        # Model loading, safetensors, LoRA adapter detection
+├── weight_diff/    # L2, cosine, SVD, spectral alpha, MP law, behavioral vectors
+├── behaviour/      # Length, format, strategy, CoT, calibration, diversity, JSD
+├── reward_hack/    # Length bias, format gaming, strategy collapse, sycophancy, probes
+├── prompts/        # Prompt suites + inference runner
+├── report/         # HTML/JSON/MD/PDF generation + Plotly visualizations
+├── nli.py          # Shared NLI model (cross-encoder/nli-deberta-v3-small)
+├── diagnoser.py    # Top-level orchestrator
+└── types.py        # 30+ shared dataclasses and enums
 ```
 
-## Status
+## Testing
 
-Afterburn is in **alpha** (v0.2.0). Here's what works today:
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Weight diff engine | **Working** | Tested against real models (Qwen 0.5B base vs Instruct) |
-| Layer metrics (L2, cosine, Frobenius) | **Working** | Full unit test coverage |
-| Attention head analysis | **Working** | Unit tested |
-| LayerNorm shift detection | **Working** | Unit tested |
-| Embedding drift | **Working** | Unit tested |
-| Behavioural analyser | **Implemented** | Unit tested, pending end-to-end validation |
-| Reasoning strategy classifier | **Implemented** | Priority-based classification, unit tested |
-| Format compliance analysis | **Implemented** | Pattern detection + per-category breakdown |
-| Chain-of-thought analysis | **Implemented** | Depth, self-correction, verification detection |
-| Reward hack detector | **Implemented** | All 4 sub-detectors + composite scoring |
-| HTML report generation | **Implemented** | Plotly visualizations, Jinja2 templates |
-| JSON/Markdown reports | **Implemented** | Full structured output |
-| CLI | **Working** | All 4 commands functional |
-| 212 unit tests | **Passing** | Covers all modules |
-
-### Roadmap
-
-- [ ] End-to-end validation on 7B+ models
-- [ ] Cloud/Colab quickstart notebook
-- [ ] Benchmark against known reward-hacked models
-- [ ] Streaming weight comparison for very large models
-- [ ] CI/CD pipeline
-- [ ] PyPI release
-
-## How It Works
-
+```bash
+pytest tests/ -v                    # 678 tests
+pytest tests/ --cov=afterburn       # with coverage
+ruff check src/ tests/              # linting
+mypy src/afterburn/                 # type checking
 ```
-Base Model ──┐
-             ├── Weight Diff ──────────────┐
-Trained Model┘                             │
-                                           ├── Diagnostic Report
-Base Model ──┐                             │     (HTML/JSON/MD/PDF)
-             ├── Prompt Runner ─┐          │
-Trained Model┘                  ├── Compare ┘
-                                │
-              Built-in Suites ──┘
-              (math, code, reasoning, safety)
-```
-
-1. **Weight diff** loads both checkpoints via memory-mapped safetensors (never both fully in RAM) and computes per-layer metrics
-2. **Prompt runner** generates outputs from both models on standardized prompt suites (loads one model at a time)
-3. **Behaviour analyser** compares output distributions statistically
-4. **Reward hack detector** looks for known failure patterns in the behavioural data
-5. **Report generator** compiles everything into a human-readable diagnostic
 
 ## Contributing
 
-This project is being built in public. Contributions welcome — especially:
-
-- Testing against more model families (Llama, Mistral, Phi, Gemma)
-- Additional prompt suites for specific domains
-- Reward hacking case studies with known-bad models
-- Documentation and tutorials
-
 ```bash
-# Development setup
 git clone https://github.com/code-mohanprakash/afterburn.git
 cd afterburn
 pip install -e ".[dev]"
 pytest tests/
 ```
+
+See [docs/contributing.md](docs/contributing.md) for architecture details and contribution guidelines.
+
+## Why Afterburn?
+
+Existing tools either analyze weights (WeightWatcher) or evaluate outputs (lm-eval-harness, Giskard, DeepEval) — but none connect weight changes to behavioral shifts to reward hacking patterns in a single workflow.
+
+Reward hacking is a [validated problem](https://metr.org/blog/2025-06-05-recent-reward-hacking/) in frontier models (METR, Anthropic). Afterburn is the open-source tool for detecting it.
 
 ## License
 

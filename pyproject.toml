@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "afterburn"
-version = "0.3.0"
+version = "0.6.0"
 description = "Post-training diagnostics for LLMs — what did fine-tuning actually do to your model?"
 readme = "README.md"
 license = "MIT"
@@ -24,29 +24,31 @@ classifiers = [
 ]
 
 dependencies = [
-    "torch>=2.0",
-    "transformers>=4.35",
-    "safetensors>=0.4",
-    "numpy>=1.24",
-    "scipy>=1.10",
-    "click>=8.1",
-    "rich>=13.0",
-    "pyyaml>=6.0",
-    "jinja2>=3.1",
-    "plotly>=5.18",
-    "huggingface-hub>=0.19",
+    "torch>=2.0,<3",
+    "transformers>=4.35,<5",
+    "safetensors>=0.4,<1",
+    "numpy>=1.24,<3",
+    "scipy>=1.10,<2",
+    "click>=8.1,<9",
+    "rich>=13.0,<14",
+    "pyyaml>=6.0,<7",
+    "jinja2>=3.1,<4",
+    "plotly>=5.18,<6",
+    "huggingface-hub>=0.19,<1",
 ]
 
 [project.optional-dependencies]
-pdf = ["weasyprint>=60"]
-semantic = ["sentence-transformers>=2.2"]
+pdf = ["weasyprint>=60,<61"]
+semantic = ["sentence-transformers>=2.2,<3"]
+nli = ["transformers>=4.35,<5"]
 dev = [
     "afterburn[pdf]",
-    "pytest>=7.4",
-    "pytest-cov>=4.1",
-    "hypothesis>=6.90",
-    "ruff>=0.1",
-    "mypy>=1.7",
+    "pytest>=7.4,<9",
+    "pytest-cov>=4.1,<6",
+    "hypothesis>=6.90,<7",
+    "ruff>=0.1,<1",
+    "mypy>=1.7,<2",
+    "mkdocs-material>=9.0,<10",
 ]
 
 [project.scripts]

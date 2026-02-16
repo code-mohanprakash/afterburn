@@ -1,6 +1,5 @@
 """Tests for SVD weight diff analysis."""
 
-import pytest
 import torch
 
 from afterburn.weight_diff.metrics import SVDResult, svd_analysis

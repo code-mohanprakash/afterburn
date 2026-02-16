@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from afterburn.exceptions import PromptSuiteError
 from afterburn.prompts.schema import validate_suite_data
@@ -32,7 +32,7 @@ class PromptSuite:
     def __len__(self) -> int:
         return len(self.prompts)
 
-    def __iter__(self):
+    def __iter__(self) -> object:
         return iter(self.prompts)
 
     @classmethod
@@ -107,25 +107,25 @@ class PromptSuite:
             )
 
     @classmethod
-    def _from_dict(cls, data: dict) -> PromptSuite:
+    def _from_dict(cls, data: dict[str, object]) -> PromptSuite:
         """Convert validated dict to PromptSuite."""
-        category = data["category"]
+        category = str(data["category"])
         prompts = [
             Prompt(
-                id=p["id"],
-                text=p["text"],
-                category=p.get("category", category),
+                id=str(p["id"]),
+                text=str(p["text"]),
+                category=str(p.get("category", category)),
                 expected_answer=p.get("expected_answer"),
                 difficulty=p.get("difficulty"),
                 tags=tuple(p.get("tags", [])),
             )
-            for p in data["prompts"]
+            for p in data["prompts"]  # type: ignore[attr-defined]
         ]
 
         return cls(
-            name=data["name"],
-            version=data.get("version", "1.0"),
-            description=data.get("description", ""),
+            name=str(data["name"]),
+            version=str(data.get("version", "1.0")),
+            description=str(data.get("description", "")),
             category=category,
             prompts=prompts,
         )

@@ -1,6 +1,5 @@
 """Tests for sycophancy detection (Phase 2 enhancements)."""
 
-import pytest
 
 from afterburn.reward_hack.sycophancy import (
     _compute_agreement_and_pushback_rates,

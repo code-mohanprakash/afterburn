@@ -1,12 +1,11 @@
 """Tests for adversarial consistency probes in sycophancy detection."""
 
-import pytest
 
 from afterburn.reward_hack.sycophancy import (
     CONSISTENCY_PROBES,
     _has_expected_fact,
-    score_consistency_probes,
     _score_consistency_probes,
+    score_consistency_probes,
 )
 from afterburn.types import PromptResult
 

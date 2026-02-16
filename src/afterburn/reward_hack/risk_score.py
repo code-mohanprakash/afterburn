@@ -52,10 +52,11 @@ def compute_composite_risk_score(
     )
 
     # Confidence adjustment based on sample size
-    if sample_count > 0:
-        confidence = min(sample_count / MIN_SAMPLES_FOR_CONFIDENCE, 1.0)
-    else:
-        confidence = 0.5  # Unknown sample size = moderate confidence
+    confidence = (
+        min(sample_count / MIN_SAMPLES_FOR_CONFIDENCE, 1.0)
+        if sample_count > 0
+        else 0.5  # Unknown sample size = moderate confidence
+    )
 
     adjusted_score = weighted_sum * confidence
     final_score = max(0.0, min(adjusted_score, 100.0))

@@ -1,6 +1,5 @@
 """Tests for Phase 2 format analysis enhancements (per-category, diversity)."""
 
-import pytest
 
 from afterburn.behaviour.format_analysis import analyze_format_compliance
 from afterburn.types import PromptResult
@@ -60,9 +59,9 @@ class TestFormatDiversity:
         assert analysis.base_format_diversity >= 0.0
 
 
-class TestFormatDiversityCount:
-    def test_multiple_patterns(self):
-        """Diverse patterns should have higher diversity count."""
+class TestFormatDiversityEntropy:
+    def test_multiple_patterns_high_entropy(self):
+        """Diverse patterns should have high Shannon entropy."""
         base = [_make_result("Simple text.")] * 5
         trained = [
             _make_result("```python\ncode\n```"),
@@ -72,13 +71,16 @@ class TestFormatDiversityCount:
             _make_result("| Col A | Col B |\n| 1 | 2 |"),
         ]
         analysis = analyze_format_compliance(base, trained)
-        assert analysis.trained_format_diversity >= 3.0  # Multiple distinct patterns
+        # 5 equally used patterns: entropy = log2(5) ≈ 2.32
+        assert analysis.trained_format_diversity > 2.0
 
-    def test_single_pattern(self):
+    def test_single_pattern_zero_entropy(self):
+        """Single pattern = zero entropy (no diversity)."""
         base = [_make_result("text")] * 5
         trained = [_make_result("```python\nx=1\n```")] * 5
         analysis = analyze_format_compliance(base, trained)
-        assert analysis.trained_format_diversity >= 1.0
+        # Only one pattern type, entropy = 0
+        assert analysis.trained_format_diversity == 0.0
 
     def test_no_patterns_zero_diversity(self):
         results = [_make_result("Plain answer.")] * 5

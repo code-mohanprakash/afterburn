@@ -1,10 +1,10 @@
 """Tests for EAD diversity analysis and SBERT semantic diversity."""
 
-import pytest
 
 from afterburn.behaviour.diversity import (
     DiversityAnalysis,
     _compute_ead,
+    _estimate_vocab_sizes,
     _extract_ngrams,
     analyze_diversity,
     compute_semantic_diversity,
@@ -30,13 +30,16 @@ class TestExtractNgrams:
 
 
 class TestComputeEAD:
+    """Test EAD = D / (V * (1 - ((V-1)/V)^T)) from Liu et al. ACL 2022."""
+
     def test_empty_outputs(self):
-        assert _compute_ead([], 1) == 0.0
+        assert _compute_ead([], 1, vocab_size=100) == 0.0
 
     def test_single_word_outputs(self):
         outputs = ["hello", "hello", "hello"]
-        ead = _compute_ead(outputs, 1)
-        assert 0.0 <= ead <= 1.0
+        # V=1 since only one unique unigram, but we pass a reasonable V
+        ead = _compute_ead(outputs, 1, vocab_size=10)
+        assert ead >= 0.0
 
     def test_diverse_outputs_higher_than_repetitive(self):
         diverse = [
@@ -53,9 +56,14 @@ class TestComputeEAD:
             "the answer is 42",
             "the answer is 42",
         ]
-        diverse_ead = _compute_ead(diverse, 1)
-        repetitive_ead = _compute_ead(repetitive, 1)
-        assert diverse_ead >= repetitive_ead
+        # Use the same vocab size for fair comparison (union of all unigrams)
+        all_tokens: set[str] = set()
+        for text in diverse + repetitive:
+            all_tokens.update(text.lower().split())
+        V = len(all_tokens)
+        diverse_ead = _compute_ead(diverse, 1, vocab_size=V)
+        repetitive_ead = _compute_ead(repetitive, 1, vocab_size=V)
+        assert diverse_ead > repetitive_ead
 
     def test_bigram_diversity(self):
         diverse = [
@@ -64,14 +72,52 @@ class TestComputeEAD:
             "computer vision detects objects",
             "reinforcement learning trains agents",
         ]
-        ead = _compute_ead(diverse, 2)
+        ead = _compute_ead(diverse, 2, vocab_size=50)
         assert ead >= 0.0
 
-    def test_bounds(self):
-        outputs = ["alpha beta gamma delta epsilon"] * 3
-        for n in range(1, 6):
-            ead = _compute_ead(outputs, n)
-            assert 0.0 <= ead <= 1.0
+    def test_perfect_uniformity(self):
+        """When all n-grams are unique and V equals D, EAD should be close to 1."""
+        # 5 outputs each with unique words
+        outputs = ["alpha", "beta", "gamma", "delta", "epsilon"]
+        # V = 5 unigrams, D = 5 distinct, T = 5 total
+        ead = _compute_ead(outputs, 1, vocab_size=5)
+        # D=5, E[D] = 5 * (1 - (4/5)^5) = 5 * (1 - 0.32768) = 5 * 0.67232 = 3.3616
+        # EAD = 5 / 3.3616 ≈ 1.487 (more diverse than uniform random!)
+        assert ead > 1.0
+
+    def test_formula_matches_manual_calculation(self):
+        """Verify EAD formula: D / (V * (1 - ((V-1)/V)^T))."""
+        outputs = ["a b c", "a b d", "a e f"]
+        # tokens: a b c a b d a e f → 9 total unigrams
+        # distinct: {a, b, c, d, e, f} = 6
+        V = 10
+        ead = _compute_ead(outputs, 1, vocab_size=V)
+        # Manual: D=6, T=9, V=10
+        # E[D] = 10 * (1 - (9/10)^9) = 10 * (1 - 0.38742) = 10 * 0.61258 = 6.1258
+        # EAD = 6 / 6.1258 ≈ 0.9795
+        expected = 6 / (10 * (1 - (9 / 10) ** 9))
+        assert abs(ead - expected) < 1e-6
+
+
+class TestEstimateVocabSizes:
+    def test_combines_both_output_sets(self):
+        base = ["hello world"]
+        trained = ["foo bar"]
+        vs = _estimate_vocab_sizes(base, trained, max_n=1)
+        # Union: {hello, world, foo, bar} = 4
+        assert vs[1] == 4
+
+    def test_fixed_vocab_size(self):
+        base = ["hello"]
+        trained = ["world"]
+        vs = _estimate_vocab_sizes(base, trained, max_n=2, fixed_vocab_size=50000)
+        assert vs[1] == 50000
+        assert vs[2] == 50000
+
+    def test_empty_outputs(self):
+        vs = _estimate_vocab_sizes([], [], max_n=3)
+        for n in range(1, 4):
+            assert vs[n] >= 1  # min is 1
 
 
 class TestAnalyzeDiversity:

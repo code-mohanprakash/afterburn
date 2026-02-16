@@ -1,9 +1,10 @@
 """Tests for shared types and dataclasses."""
 
+from pathlib import Path
+
 import pytest
 
 from afterburn.types import (
-    DiagnosticReport,
     LayerDiff,
     ModelPair,
     ReportFormat,
@@ -11,7 +12,6 @@ from afterburn.types import (
     TrainingMethod,
     _detect_format,
 )
-from pathlib import Path
 
 
 class TestTrainingMethod:

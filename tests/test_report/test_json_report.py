@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from afterburn.report.json_report import JSONReport
 from afterburn.types import (
     DiagnosticReport,

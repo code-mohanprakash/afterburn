@@ -1,14 +1,18 @@
 """Tests for format gaming detection (Phase 2 enhancements)."""
 
+import re
+
 import pytest
 
 from afterburn.reward_hack.format_gaming import (
     _check_category_consistency,
     _check_format_correctness_correlation,
+    _lcs_length,
     detect_format_gaming,
+    rouge_l_f1,
+    rouge_l_recall,
 )
 from afterburn.types import PromptResult
-import re
 
 
 def _make_result(
@@ -127,3 +131,81 @@ class TestCategoryConsistency:
         results = [_make_result("\\boxed{5}", category="math")] * 5
         cv = _check_category_consistency(results, pattern)
         assert cv == 0.0  # Single category → can't assess
+
+
+class TestLCSLength:
+    def test_identical(self):
+        assert _lcs_length(["a", "b", "c"], ["a", "b", "c"]) == 3
+
+    def test_empty(self):
+        assert _lcs_length([], ["a", "b"]) == 0
+        assert _lcs_length(["a"], []) == 0
+
+    def test_no_common(self):
+        assert _lcs_length(["a", "b"], ["c", "d"]) == 0
+
+    def test_partial_overlap(self):
+        assert _lcs_length(["a", "b", "c", "d"], ["a", "c", "d"]) == 3
+
+    def test_subsequence_not_substring(self):
+        # LCS allows gaps: "a c" is a subsequence of "a b c"
+        assert _lcs_length(["a", "c"], ["a", "b", "c"]) == 2
+
+
+class TestRougeL:
+    def test_perfect_recall(self):
+        """Reference fully contained in candidate should give recall=1."""
+        assert rouge_l_recall("42", "The answer is 42 as computed") == 1.0
+
+    def test_zero_recall(self):
+        """No overlap should give recall=0."""
+        assert rouge_l_recall("42", "no numbers here") == 0.0
+
+    def test_partial_recall(self):
+        """Partial overlap should give intermediate recall."""
+        r = rouge_l_recall("the answer is forty two", "the answer is unknown")
+        assert 0.0 < r < 1.0
+
+    def test_paraphrase_robustness(self):
+        """ROUGE-L captures sequential overlap; heavy reordering reduces recall."""
+        r = rouge_l_recall(
+            "Paris is the capital",
+            "The capital of France is Paris, a beautiful city"
+        )
+        # LCS = ["the", "capital"] = 2/4 = 0.5 (order matters in LCS)
+        assert r == pytest.approx(0.5, abs=0.01)
+
+    def test_same_order_high_recall(self):
+        """When reference order is preserved in candidate, recall is high."""
+        r = rouge_l_recall(
+            "the answer is 42",
+            "after thinking, the answer is definitely 42 and correct"
+        )
+        # LCS = "the answer is 42" = 4/4 = 1.0
+        assert r == 1.0
+
+    def test_f1_identical(self):
+        assert rouge_l_f1("hello world", "hello world") == pytest.approx(1.0)
+
+    def test_f1_empty(self):
+        assert rouge_l_f1("", "hello") == 0.0
+        assert rouge_l_f1("hello", "") == 0.0
+
+    def test_f1_partial(self):
+        f1 = rouge_l_f1("the cat sat", "the cat ran fast")
+        assert 0.0 < f1 < 1.0
+
+    def test_recall_used_in_correlation(self):
+        """Verify that answer verification uses ROUGE-L recall (not substring)."""
+        pattern = re.compile(r"\\boxed\{.*?\}")
+        # Expected answer is a paraphrase — substring match would fail
+        results = [
+            _make_result(
+                "We compute step by step: \\boxed{the result is forty two}",
+                expected_answer="forty two"
+            ),
+        ]
+        signal = _check_format_correctness_correlation(results, pattern)
+        # ROUGE-L recall of "forty two" in the output should be 1.0
+        # so this should be classified as correct, giving low gaming signal
+        assert signal <= 0.5

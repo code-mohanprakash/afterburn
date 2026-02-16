@@ -1,6 +1,5 @@
 """Tests for chain-of-thought analysis (Phase 2 enhancements)."""
 
-import pytest
 
 from afterburn.behaviour.cot_analysis import (
     _count_reasoning_steps,

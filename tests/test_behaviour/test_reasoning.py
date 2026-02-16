@@ -1,6 +1,5 @@
 """Tests for reasoning strategy classification."""
 
-import pytest
 
 from afterburn.behaviour.reasoning import classify_reasoning_strategy
 from afterburn.types import ReasoningStrategy

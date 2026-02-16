@@ -1,6 +1,5 @@
 """Tests for Phase 2 Plotly visualization functions."""
 
-import pytest
 
 from afterburn.report.visualizations import (
     create_calibration_curve,

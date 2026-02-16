@@ -129,10 +129,30 @@ class MarkdownReport:
             lines.append("| Check | Score | Flagged | Detail |")
             lines.append("|-------|-------|---------|--------|")
             checks = [
-                ("Length Bias", rh.length_bias.score, rh.length_bias.is_flagged, rh.length_bias.detail),
-                ("Format Gaming", rh.format_gaming.score, rh.format_gaming.is_flagged, rh.format_gaming.detail),
-                ("Strategy Collapse", rh.strategy_collapse.score, rh.strategy_collapse.is_flagged, rh.strategy_collapse.detail),
-                ("Sycophancy", rh.sycophancy.score, rh.sycophancy.is_flagged, rh.sycophancy.detail),
+                (
+                    "Length Bias",
+                    rh.length_bias.score,
+                    rh.length_bias.is_flagged,
+                    rh.length_bias.detail,
+                ),
+                (
+                    "Format Gaming",
+                    rh.format_gaming.score,
+                    rh.format_gaming.is_flagged,
+                    rh.format_gaming.detail,
+                ),
+                (
+                    "Strategy Collapse",
+                    rh.strategy_collapse.score,
+                    rh.strategy_collapse.is_flagged,
+                    rh.strategy_collapse.detail,
+                ),
+                (
+                    "Sycophancy",
+                    rh.sycophancy.score,
+                    rh.sycophancy.is_flagged,
+                    rh.sycophancy.detail,
+                ),
             ]
             for name, score, flagged, detail in checks:
                 flag_str = "⚠ Yes" if flagged else "No"

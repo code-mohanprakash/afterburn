@@ -6,7 +6,6 @@ import numpy as np
 
 from afterburn.types import CalibrationAnalysis, CalibrationBin, PromptResult
 
-
 NUM_BINS = 10
 
 

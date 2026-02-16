@@ -1,37 +1,29 @@
-"""Token probability KL divergence between base and trained model outputs.
+"""Token probability Jensen-Shannon divergence between base and trained models.
 
 Measures how differently two models "think" at the token probability level,
 beyond just the surface text. Inspired by LMdiff (Strobelt et al., EMNLP 2021).
 
-When both models have token probability data (collected via collect_logits=True),
-this computes per-prompt and aggregate KL divergence between their output
-distributions.
+Uses JSD instead of KL divergence because:
+- JSD is symmetric: JSD(P||Q) = JSD(Q||P)
+- JSD is always defined (no division-by-zero when supports differ)
+- JSD is bounded: 0 <= JSD <= 1 (with log base 2)
+
+    JSD(P || Q) = (1/2) * KL(P || M) + (1/2) * KL(Q || M)
+    where M = (P + Q) / 2
 """
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from collections import defaultdict
 
-from afterburn.types import PromptResult
+import numpy as np
 
+from afterburn.ci import bootstrap_ci
+from afterburn.types import ConfidenceInterval, PromptResult, TokenDivergenceAnalysis
 
-@dataclass
-class TokenDivergenceAnalysis:
-    """Token-level probability divergence between base and trained models."""
-
-    # Mean KL divergence across all prompts (bits)
-    mean_kl_divergence: float = 0.0
-    # Per-prompt KL divergences
-    per_prompt_kl: list[float] = field(default_factory=list)
-    # Prompts with highest divergence (prompt_id, kl_value)
-    top_divergent_prompts: list[tuple[str, float]] = field(default_factory=list)
-    # Per-category average KL
-    per_category: dict[str, float] = field(default_factory=dict)
-    # Whether token probability data was available
-    has_token_probs: bool = False
-    # Number of prompts analyzed
-    num_prompts_analyzed: int = 0
+# Re-export so existing imports from this module keep working
+__all__ = ["TokenDivergenceAnalysis", "analyze_token_divergence"]
 
 
 def analyze_token_divergence(
@@ -39,11 +31,10 @@ def analyze_token_divergence(
     trained_results: list[PromptResult],
     top_n: int = 5,
 ) -> TokenDivergenceAnalysis:
-    """Compute KL divergence between base and trained token probability distributions.
+    """Compute JSD between base and trained token probability distributions.
 
     For each prompt that has token probability data in both models, computes
-    the average KL divergence across generated tokens. Returns aggregate
-    statistics and identifies the most divergent prompts.
+    the average Jensen-Shannon divergence across generated tokens.
 
     Args:
         base_results: Results from the base model (with top_token_probs).
@@ -51,7 +42,7 @@ def analyze_token_divergence(
         top_n: Number of top divergent prompts to report.
 
     Returns:
-        TokenDivergenceAnalysis with KL divergence metrics.
+        TokenDivergenceAnalysis with JSD metrics.
     """
     # Match results by prompt_id
     base_by_id = {r.prompt_id: r for r in base_results}
@@ -59,7 +50,7 @@ def analyze_token_divergence(
 
     common_ids = set(base_by_id.keys()) & set(trained_by_id.keys())
 
-    per_prompt_kl: list[tuple[str, str, float]] = []  # (prompt_id, category, kl)
+    per_prompt: list[tuple[str, str, float]] = []  # (prompt_id, category, jsd)
 
     for pid in sorted(common_ids):
         base_r = base_by_id[pid]
@@ -68,78 +59,103 @@ def analyze_token_divergence(
         if not base_r.top_token_probs or not trained_r.top_token_probs:
             continue
 
-        kl = _compute_prompt_kl(base_r.top_token_probs, trained_r.top_token_probs)
-        if kl is not None:
-            per_prompt_kl.append((pid, base_r.category, kl))
+        jsd = _compute_prompt_jsd(base_r.top_token_probs, trained_r.top_token_probs)
+        if jsd is not None:
+            per_prompt.append((pid, base_r.category, jsd))
 
-    if not per_prompt_kl:
+    if not per_prompt:
         return TokenDivergenceAnalysis(has_token_probs=False)
 
-    kl_values = [kl for _, _, kl in per_prompt_kl]
-    mean_kl = sum(kl_values) / len(kl_values)
+    jsd_values = [jsd for _, _, jsd in per_prompt]
+    mean_jsd = sum(jsd_values) / len(jsd_values)
 
     # Top divergent prompts
-    sorted_by_kl = sorted(per_prompt_kl, key=lambda x: x[2], reverse=True)
-    top_divergent = [(pid, kl) for pid, _, kl in sorted_by_kl[:top_n]]
+    sorted_by_jsd = sorted(per_prompt, key=lambda x: x[2], reverse=True)
+    top_divergent = [(pid, jsd) for pid, _, jsd in sorted_by_jsd[:top_n]]
 
     # Per-category
-    from collections import defaultdict
-    cat_kls: dict[str, list[float]] = defaultdict(list)
-    for _, cat, kl in per_prompt_kl:
-        cat_kls[cat].append(kl)
+    cat_jsds: dict[str, list[float]] = defaultdict(list)
+    for _, cat, jsd in per_prompt:
+        cat_jsds[cat].append(jsd)
 
     per_category = {
-        cat: sum(kls) / len(kls) for cat, kls in sorted(cat_kls.items())
+        cat: sum(jsds) / len(jsds) for cat, jsds in sorted(cat_jsds.items())
     }
 
+    # Bootstrap CI for mean JSD
+    jsd_arr = np.array(jsd_values)
+    ci_lower, ci_upper = bootstrap_ci(jsd_arr, statistic="mean")
+    ci_mean_jsd = ConfidenceInterval(lower=ci_lower, upper=ci_upper)
+
     return TokenDivergenceAnalysis(
-        mean_kl_divergence=mean_kl,
-        per_prompt_kl=kl_values,
+        mean_jsd=mean_jsd,
+        per_prompt_jsd=jsd_values,
         top_divergent_prompts=top_divergent,
         per_category=per_category,
         has_token_probs=True,
-        num_prompts_analyzed=len(per_prompt_kl),
+        num_prompts_analyzed=len(per_prompt),
+        mean_jsd_ci=ci_mean_jsd,
     )
 
 
-def _compute_prompt_kl(
+def _compute_prompt_jsd(
     base_probs: list[dict[str, float]],
     trained_probs: list[dict[str, float]],
 ) -> float | None:
-    """Compute average KL divergence across token positions for one prompt.
+    """Compute average Jensen-Shannon divergence across token positions.
 
-    KL(base || trained) = sum(base[t] * log(base[t] / trained[t]))
+    JSD(P || Q) = (1/2) * KL(P || M) + (1/2) * KL(Q || M)
+    where M = (P + Q) / 2
 
-    Uses the top-k probability dictionaries from both models. Tokens not
-    in the other model's top-k get a small epsilon probability.
+    JSD is bounded [0, 1] when using log base 2.
+    No epsilon smoothing needed — the mixture M guarantees non-zero denominators.
     """
     if not base_probs or not trained_probs:
         return None
 
-    eps = 1e-10
-    kl_sum = 0.0
     num_steps = min(len(base_probs), len(trained_probs))
-
     if num_steps == 0:
         return None
+
+    jsd_sum = 0.0
+    valid_steps = 0
 
     for step in range(num_steps):
         base_dist = base_probs[step]
         trained_dist = trained_probs[step]
 
-        if not base_dist:
+        if not base_dist and not trained_dist:
             continue
 
-        # Get all tokens from both distributions
-        all_tokens = set(base_dist.keys()) | set(trained_dist.keys())
+        jsd = _jsd_dicts(base_dist, trained_dist)
+        jsd_sum += jsd
+        valid_steps += 1
 
-        step_kl = 0.0
-        for token in all_tokens:
-            p = base_dist.get(token, eps)
-            q = trained_dist.get(token, eps)
-            if p > eps:
-                step_kl += p * math.log(max(p, eps) / max(q, eps))
+    if valid_steps == 0:
+        return None
 
-        kl_sum += max(0.0, step_kl)
+    return jsd_sum / valid_steps
 
-    return kl_sum / num_steps
+
+def _jsd_dicts(p: dict[str, float], q: dict[str, float]) -> float:
+    """Jensen-Shannon divergence between two token probability dicts.
+
+    Handles tokens appearing in only one distribution naturally via the
+    mixture M = (P + Q) / 2, which is always > 0 for any token in either dist.
+    """
+    all_tokens = set(p.keys()) | set(q.keys())
+
+    jsd = 0.0
+    for token in all_tokens:
+        p_i = p.get(token, 0.0)
+        q_i = q.get(token, 0.0)
+        m_i = 0.5 * (p_i + q_i)
+
+        if m_i > 0:
+            if p_i > 0:
+                jsd += 0.5 * p_i * math.log2(p_i / m_i)
+            if q_i > 0:
+                jsd += 0.5 * q_i * math.log2(q_i / m_i)
+
+    # Clamp to [0, 1] to handle floating point errors
+    return max(0.0, min(1.0, jsd))

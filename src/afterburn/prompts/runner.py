@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizer
@@ -111,7 +111,11 @@ class PromptRunner:
             output_ids = gen_output.sequences
             scores = gen_output.scores  # tuple of (batch_size, vocab_size) per step
         else:
-            output_ids = gen_output if not hasattr(gen_output, "sequences") else gen_output.sequences
+            output_ids = (
+                gen_output
+                if not hasattr(gen_output, "sequences")
+                else gen_output.sequences
+            )
             scores = None
 
         # Decode outputs
@@ -144,7 +148,7 @@ class PromptRunner:
 
     def _extract_top_k_probs(
         self,
-        scores: tuple,
+        scores: tuple[object, ...],
         batch_idx: int,
         num_tokens: int,
     ) -> list[dict[str, float]]:
@@ -153,7 +157,7 @@ class PromptRunner:
         k = self.top_k_probs
 
         for step_idx in range(min(num_tokens, len(scores))):
-            logits = scores[step_idx][batch_idx]
+            logits = scores[step_idx][batch_idx]  # type: ignore[index]
             probs = torch.softmax(logits, dim=-1)
             top_k_vals, top_k_ids = torch.topk(probs, k=min(k, probs.size(-1)))
 

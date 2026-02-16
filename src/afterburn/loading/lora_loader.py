@@ -70,8 +70,8 @@ def load_lora_adapter(adapter_path: str | Path) -> LoRAWeights:
     if safetensors_path.exists():
         from safetensors import safe_open
 
-        with safe_open(str(safetensors_path), framework="pt", device="cpu") as f:
-            for key in f.keys():
+        with safe_open(str(safetensors_path), framework="pt", device="cpu") as f:  # type: ignore[no-untyped-call]
+            for key in f.keys():  # type: ignore[attr-defined]  # noqa: SIM118
                 weights[key] = f.get_tensor(key)
     elif bin_path.exists():
         weights = torch.load(str(bin_path), map_location="cpu", weights_only=True)

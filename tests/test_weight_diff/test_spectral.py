@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from afterburn.weight_diff.spectral import SpectralResult, spectral_analysis, _fit_power_law_alpha
+from afterburn.weight_diff.spectral import SpectralResult, _fit_power_law_alpha, spectral_analysis
 
 
 class TestSpectralAnalysis:
