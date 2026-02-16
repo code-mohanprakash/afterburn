@@ -1,0 +1,2002 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Post-training diagnostics for LLMs">
+      
+      
+      
+        <link rel="canonical" href="https://code-mohanprakash.github.io/afterburn/guide/deployment/">
+      
+      
+        <link rel="prev" href="../reports/">
+      
+      
+        <link rel="next" href="../../api/diagnoser/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Production Deployment - Afterburn</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-orange" data-md-color-accent="orange">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#production-deployment-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Afterburn" class="md-header__button md-logo" aria-label="Afterburn" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Afterburn
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Production Deployment
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-orange" data-md-color-accent="orange"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-orange" data-md-color-accent="orange"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/code-mohanprakash/afterburn" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    code-mohanprakash/afterburn
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Afterburn" class="md-nav__button md-logo" aria-label="Afterburn" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Afterburn
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/code-mohanprakash/afterburn" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    code-mohanprakash/afterburn
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../weight-diff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weight Diff Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../behaviour/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Behavioral Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reward-hacking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reward Hacking Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#system-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dockerfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dockerfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker-composeyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docker-compose.yml
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory-sizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory Sizing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory Sizing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#formula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formula
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cicd-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI/CD Integration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CI/CD Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#github-actions-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Actions Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gitlab-ci-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitLab CI Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Tuning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance Tuning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cpu-vs-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU vs GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-size-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Size Tuning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skip-expensive-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skip Expensive Modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disk-io-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk I/O Optimization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitoring
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monitoring">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#json-log-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON Log Aggregation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elk-stack-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ELK Stack Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloudwatch-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CloudWatch Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prometheus-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prometheus Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#out-of-memory-oom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of Memory (OOM)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-not-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Not Found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#huggingface-rate-limiting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HuggingFace Rate Limiting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slow-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slow Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#permission-denied-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Permission Denied (Docker)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda-version-mismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA Version Mismatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#report-generation-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Report Generation Fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/diagnoser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnoser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#system-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dockerfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dockerfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker-composeyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docker-compose.yml
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory-sizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory Sizing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory Sizing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#formula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formula
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cicd-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI/CD Integration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CI/CD Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#github-actions-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Actions Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gitlab-ci-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitLab CI Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Tuning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance Tuning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cpu-vs-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU vs GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-size-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Size Tuning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skip-expensive-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skip Expensive Modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disk-io-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk I/O Optimization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitoring
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monitoring">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#json-log-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON Log Aggregation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elk-stack-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ELK Stack Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloudwatch-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CloudWatch Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prometheus-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prometheus Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#out-of-memory-oom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of Memory (OOM)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-not-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Not Found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#huggingface-rate-limiting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HuggingFace Rate Limiting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slow-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slow Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#permission-denied-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Permission Denied (Docker)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda-version-mismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA Version Mismatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#report-generation-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Report Generation Fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="production-deployment-guide">Production Deployment Guide</h1>
+<p>This guide covers deploying Afterburn in production environments for automated post-training diagnostics.</p>
+<h2 id="system-requirements">System Requirements</h2>
+<p>Memory and compute requirements vary by model size:</p>
+<table>
+<thead>
+<tr>
+<th>Model Size</th>
+<th>RAM (CPU)</th>
+<th>VRAM (GPU)</th>
+<th>Recommended CPU</th>
+<th>Recommended GPU</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.5B - 1B</td>
+<td>8 GB</td>
+<td>4 GB</td>
+<td>4+ cores</td>
+<td>T4 / RTX 3060</td>
+</tr>
+<tr>
+<td>7B</td>
+<td>32 GB</td>
+<td>16 GB</td>
+<td>8+ cores</td>
+<td>A10 / RTX 4090</td>
+</tr>
+<tr>
+<td>13B</td>
+<td>64 GB</td>
+<td>24 GB</td>
+<td>16+ cores</td>
+<td>A100 40GB</td>
+</tr>
+<tr>
+<td>70B+</td>
+<td>256 GB</td>
+<td>80 GB</td>
+<td>32+ cores</td>
+<td>A100 80GB x2</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Notes:</strong>
+- CPU-only mode requires 2-3x more RAM than listed above
+- Add 20% overhead for analysis artifacts and reports
+- SSD storage recommended for model caching (100+ GB free space)</p>
+<h2 id="docker">Docker</h2>
+<h3 id="dockerfile">Dockerfile</h3>
+<div class="highlight"><pre><span></span><code><span class="k">FROM</span><span class="w"> </span><span class="s">python:3.11-slim</span>
+
+<span class="c"># Install system dependencies</span>
+<span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>git<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="o">&amp;&amp;</span><span class="w"> </span>rm<span class="w"> </span>-rf<span class="w"> </span>/var/lib/apt/lists/*
+
+<span class="c"># Create non-root user</span>
+<span class="k">RUN</span><span class="w"> </span>useradd<span class="w"> </span>-m<span class="w"> </span>-u<span class="w"> </span><span class="m">1000</span><span class="w"> </span>afterburn
+<span class="k">WORKDIR</span><span class="w"> </span><span class="s">/app</span>
+<span class="k">RUN</span><span class="w"> </span>chown<span class="w"> </span>afterburn:afterburn<span class="w"> </span>/app
+
+<span class="k">USER</span><span class="w"> </span><span class="s">afterburn</span>
+
+<span class="c"># Install afterburn</span>
+<span class="k">COPY</span><span class="w"> </span>--chown<span class="o">=</span>afterburn:afterburn<span class="w"> </span>.<span class="w"> </span>/app
+<span class="k">RUN</span><span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--no-cache-dir<span class="w"> </span>-e<span class="w"> </span>.
+
+<span class="c"># Set HuggingFace cache directory</span>
+<span class="k">ENV</span><span class="w"> </span><span class="nv">HF_HOME</span><span class="o">=</span>/app/.cache/huggingface
+<span class="k">ENV</span><span class="w"> </span><span class="nv">TRANSFORMERS_CACHE</span><span class="o">=</span>/app/.cache/huggingface
+
+<span class="k">ENTRYPOINT</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;afterburn&quot;</span><span class="p">]</span>
+<span class="k">CMD</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;--help&quot;</span><span class="p">]</span>
+</code></pre></div>
+<h3 id="docker-composeyml">docker-compose.yml</h3>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;3.8&#39;</span>
+
+<span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">afterburn</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.</span>
+<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./models:/app/models</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./reports:/app/reports</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hf-cache:/app/.cache/huggingface</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HF_TOKEN=${HF_TOKEN}</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CUDA_VISIBLE_DEVICES=0</span>
+<span class="w">    </span><span class="nt">deploy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">reservations</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">devices</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nvidia</span>
+<span class="w">              </span><span class="nt">count</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">              </span><span class="nt">capabilities</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">gpu</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
+<span class="w">      </span><span class="no">diagnose</span>
+<span class="w">      </span><span class="no">--base /app/models/base</span>
+<span class="w">      </span><span class="no">--trained /app/models/trained</span>
+<span class="w">      </span><span class="no">--output /app/reports/report.html</span>
+<span class="w">      </span><span class="no">--log-format json</span>
+
+<span class="nt">volumes</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">hf-cache</span><span class="p">:</span>
+</code></pre></div>
+<p><strong>Usage:</strong>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">HF_TOKEN</span><span class="o">=</span>hf_xxx
+docker-compose<span class="w"> </span>up
+</code></pre></div></p>
+<h2 id="memory-sizing">Memory Sizing</h2>
+<h3 id="formula">Formula</h3>
+<div class="highlight"><pre><span></span><code>RAM (GB) = (Model_Params × Precision_Bytes × Safety_Factor) / 1e9
+
+# For analysis:
+Total_RAM = Base_Model_RAM + Trained_Model_RAM + Analysis_Overhead
+</code></pre></div>
+<p><strong>Examples:</strong>
+- <strong>7B model (fp16):</strong> 7B × 2 bytes × 1.2 = ~17 GB per model → 34 GB + 4 GB overhead = <strong>38 GB total</strong>
+- <strong>13B model (fp16):</strong> 13B × 2 bytes × 1.2 = ~31 GB per model → 62 GB + 6 GB overhead = <strong>68 GB total</strong></p>
+<p><strong>Precision options:</strong>
+- <code>fp16</code> / <code>bfloat16</code>: 2 bytes per parameter
+- <code>fp32</code>: 4 bytes per parameter
+- <code>int8</code>: 1 byte per parameter (if quantized)</p>
+<p><strong>Safety factor (1.2)</strong> accounts for:
+- Gradient computation during analysis
+- Temporary tensors and intermediate results
+- Python runtime overhead</p>
+<h2 id="cicd-integration">CI/CD Integration</h2>
+<h3 id="github-actions-example">GitHub Actions Example</h3>
+<p>Automated post-training validation in CI pipeline:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Post-Training Validation</span>
+
+<span class="nt">on</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">push</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">paths</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;models/**&#39;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;training/**&#39;</span>
+
+<span class="nt">jobs</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">afterburn-check</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w">    </span><span class="nt">container</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nvidia/cuda:12.1.0-runtime-ubuntu22.04</span>
+
+<span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Setup Python</span>
+<span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/setup-python@v4</span>
+<span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">python-version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;3.11&#39;</span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install Afterburn</span>
+<span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pip install afterburn</span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Download Models</span>
+<span class="w">        </span><span class="nt">env</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">HF_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ secrets.HF_TOKEN }}</span>
+<span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">          </span><span class="no">huggingface-cli download meta-llama/Llama-3.1-8B --local-dir ./base</span>
+<span class="w">          </span><span class="no">huggingface-cli download ${{ github.repository_owner }}/trained-model --local-dir ./trained</span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Run Diagnostics</span>
+<span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">          </span><span class="no">afterburn diagnose \</span>
+<span class="w">            </span><span class="no">--base ./base \</span>
+<span class="w">            </span><span class="no">--trained ./trained \</span>
+<span class="w">            </span><span class="no">--output report.html \</span>
+<span class="w">            </span><span class="no">--log-format json \</span>
+<span class="w">            </span><span class="no">&gt; diagnostics.log</span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Upload Report</span>
+<span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/upload-artifact@v3</span>
+<span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">afterburn-report</span>
+<span class="w">          </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">            </span><span class="no">report.html</span>
+<span class="w">            </span><span class="no">diagnostics.log</span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Check for Reward Hacking</span>
+<span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">          </span><span class="no">afterburn hack-check \</span>
+<span class="w">            </span><span class="no">--base ./base \</span>
+<span class="w">            </span><span class="no">--trained ./trained \</span>
+<span class="w">            </span><span class="no">--dataset gsm8k \</span>
+<span class="w">            </span><span class="no">--threshold 0.15 \</span>
+<span class="w">            </span><span class="no">--fail-on-detection</span>
+</code></pre></div>
+<h3 id="gitlab-ci-example">GitLab CI Example</h3>
+<div class="highlight"><pre><span></span><code><span class="nt">afterburn:diagnostics</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">validate</span>
+<span class="w">  </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python:3.11</span>
+<span class="w">  </span><span class="nt">before_script</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pip install afterburn</span>
+<span class="w">  </span><span class="nt">script</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">afterburn diagnose --base $BASE_MODEL --trained $TRAINED_MODEL -o report.html</span>
+<span class="w">  </span><span class="nt">artifacts</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">paths</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">report.html</span>
+<span class="w">    </span><span class="nt">expire_in</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30 days</span>
+<span class="w">  </span><span class="nt">only</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">main</span>
+</code></pre></div>
+<h2 id="performance-tuning">Performance Tuning</h2>
+<h3 id="cpu-vs-gpu">CPU vs GPU</h3>
+<p><strong>GPU (Recommended):</strong>
+<div class="highlight"><pre><span></span><code>afterburn<span class="w"> </span>diagnose<span class="w"> </span>--base<span class="w"> </span>base<span class="w"> </span>--trained<span class="w"> </span>trained<span class="w"> </span>-o<span class="w"> </span>report.html
+<span class="c1"># Uses GPU automatically if available</span>
+</code></pre></div></p>
+<p><strong>CPU-only:</strong>
+<div class="highlight"><pre><span></span><code><span class="nv">CUDA_VISIBLE_DEVICES</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="w"> </span>afterburn<span class="w"> </span>diagnose<span class="w"> </span>--base<span class="w"> </span>base<span class="w"> </span>--trained<span class="w"> </span>trained<span class="w"> </span>-o<span class="w"> </span>report.html
+<span class="c1"># Slower but works without GPU</span>
+</code></pre></div></p>
+<h3 id="batch-size-tuning">Batch Size Tuning</h3>
+<p>For behavioral analysis, increase batch size for throughput:</p>
+<div class="highlight"><pre><span></span><code>afterburn<span class="w"> </span>behaviour<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--base<span class="w"> </span>base<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--trained<span class="w"> </span>trained<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dataset<span class="w"> </span>alpaca<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--batch-size<span class="w"> </span><span class="m">32</span><span class="w">  </span><span class="c1"># Default: 16, increase for faster inference</span>
+</code></pre></div>
+<p><strong>Guidelines:</strong>
+- T4 / RTX 3060: batch_size = 8-16
+- A10 / RTX 4090: batch_size = 16-32
+- A100: batch_size = 32-64</p>
+<h3 id="skip-expensive-modules">Skip Expensive Modules</h3>
+<p>Speed up analysis by skipping optional modules:</p>
+<div class="highlight"><pre><span></span><code>afterburn<span class="w"> </span>diagnose<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--base<span class="w"> </span>base<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--trained<span class="w"> </span>trained<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--modules<span class="w"> </span>weight_diff<span class="w"> </span>behaviour<span class="w">  </span><span class="c1"># Skip semantic, nli, etc.</span>
+<span class="w">  </span>-o<span class="w"> </span>report.html
+</code></pre></div>
+<p><strong>Module runtime comparison (7B model):</strong>
+- <code>weight_diff</code>: ~2 minutes (always fast)
+- <code>behaviour</code>: ~10 minutes (depends on dataset size)
+- <code>reward_hack</code>: ~15 minutes (requires inference)
+- <code>semantic</code>: ~20 minutes (requires embedding model)</p>
+<h3 id="disk-io-optimization">Disk I/O Optimization</h3>
+<p>Cache models on SSD and use local directories:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Pre-download models</span>
+huggingface-cli<span class="w"> </span>download<span class="w"> </span>meta-llama/Llama-3.1-8B<span class="w"> </span>--local-dir<span class="w"> </span>/ssd/models/base
+
+<span class="c1"># Use local paths</span>
+afterburn<span class="w"> </span>diagnose<span class="w"> </span>--base<span class="w"> </span>/ssd/models/base<span class="w"> </span>--trained<span class="w"> </span>/ssd/models/trained<span class="w"> </span>-o<span class="w"> </span>report.html
+</code></pre></div>
+<h2 id="monitoring">Monitoring</h2>
+<h3 id="json-log-aggregation">JSON Log Aggregation</h3>
+<p>Enable JSON logging for structured log ingestion:</p>
+<div class="highlight"><pre><span></span><code>afterburn<span class="w"> </span>diagnose<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--base<span class="w"> </span>base<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--trained<span class="w"> </span>trained<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--log-format<span class="w"> </span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-o<span class="w"> </span>report.html<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>&gt;<span class="w"> </span>afterburn.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span>
+</code></pre></div>
+<p><strong>Sample JSON output:</strong>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-02-15T14:30:00&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;INFO&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;logger&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;afterburn.engine&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Loading base model&quot;</span><span class="p">}</span>
+<span class="p">{</span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-02-15T14:30:15&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;INFO&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;logger&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;afterburn.weight_diff&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Processing layer 5/32&quot;</span><span class="p">}</span>
+<span class="p">{</span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-02-15T14:31:00&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;WARNING&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;logger&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;afterburn.behaviour&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;High divergence detected in layer 12&quot;</span><span class="p">}</span>
+</code></pre></div></p>
+<h3 id="elk-stack-integration">ELK Stack Integration</h3>
+<p><strong>Filebeat configuration:</strong>
+<div class="highlight"><pre><span></span><code><span class="nt">filebeat.inputs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log</span>
+<span class="w">    </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">paths</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/log/afterburn/*.log</span>
+<span class="w">    </span><span class="nt">json.keys_under_root</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">json.add_error_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="nt">output.elasticsearch</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">hosts</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;localhost:9200&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">index</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;afterburn-logs-%{+yyyy.MM.dd}&quot;</span>
+</code></pre></div></p>
+<h3 id="cloudwatch-integration">CloudWatch Integration</h3>
+<div class="highlight"><pre><span></span><code>aws<span class="w"> </span>logs<span class="w"> </span>create-log-group<span class="w"> </span>--log-group-name<span class="w"> </span>/afterburn/diagnostics
+
+afterburn<span class="w"> </span>diagnose<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--base<span class="w"> </span>base<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--trained<span class="w"> </span>trained<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--log-format<span class="w"> </span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>aws<span class="w"> </span>logs<span class="w"> </span>put-log-events<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--log-group-name<span class="w"> </span>/afterburn/diagnostics<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--log-stream-name<span class="w"> </span><span class="k">$(</span>date<span class="w"> </span>+%Y%m%d-%H%M%S<span class="k">)</span>
+</code></pre></div>
+<h3 id="prometheus-metrics">Prometheus Metrics</h3>
+<p>Parse JSON logs to extract metrics:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_metrics</span><span class="p">(</span><span class="n">log_file</span><span class="p">):</span>
+    <span class="n">metrics</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;layer_processing_time&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;warnings&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">log_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">entry</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">:</span>
+                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;warnings&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="s2">&quot;Processing layer&quot;</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;message&quot;</span><span class="p">]:</span>
+                <span class="c1"># Extract timing info</span>
+                <span class="k">pass</span>
+    <span class="k">return</span> <span class="n">metrics</span>
+</code></pre></div>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="out-of-memory-oom">Out of Memory (OOM)</h3>
+<p><strong>Symptom:</strong> Process killed or CUDA OOM error</p>
+<p><strong>Solutions:</strong>
+1. Use smaller batch size: <code>--batch-size 8</code>
+2. Enable CPU offloading: <code>--device cpu</code>
+3. Reduce model precision: Use quantized models (int8)
+4. Skip memory-intensive modules: <code>--modules weight_diff</code></p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># Low-memory mode</span>
+<span class="nv">PYTORCH_CUDA_ALLOC_CONF</span><span class="o">=</span>max_split_size_mb:512<span class="w"> </span><span class="se">\</span>
+afterburn<span class="w"> </span>diagnose<span class="w"> </span>--base<span class="w"> </span>base<span class="w"> </span>--trained<span class="w"> </span>trained<span class="w"> </span>--batch-size<span class="w"> </span><span class="m">4</span><span class="w"> </span>-o<span class="w"> </span>report.html
+</code></pre></div></p>
+<h3 id="model-not-found">Model Not Found</h3>
+<p><strong>Symptom:</strong> <code>OSError: meta-llama/Llama-3.1-8B does not exist</code></p>
+<p><strong>Solutions:</strong>
+1. Authenticate with HuggingFace:
+<div class="highlight"><pre><span></span><code>huggingface-cli<span class="w"> </span>login
+<span class="c1"># or</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">HF_TOKEN</span><span class="o">=</span>hf_xxxxx
+</code></pre></div></p>
+<ol>
+<li>Check model name spelling and access permissions</li>
+<li>Pre-download model:
+<div class="highlight"><pre><span></span><code>huggingface-cli<span class="w"> </span>download<span class="w"> </span>meta-llama/Llama-3.1-8B<span class="w"> </span>--local-dir<span class="w"> </span>./model
+afterburn<span class="w"> </span>diagnose<span class="w"> </span>--base<span class="w"> </span>./model<span class="w"> </span>--trained<span class="w"> </span>trained<span class="w"> </span>-o<span class="w"> </span>report.html
+</code></pre></div></li>
+</ol>
+<h3 id="huggingface-rate-limiting">HuggingFace Rate Limiting</h3>
+<p><strong>Symptom:</strong> <code>HTTP 429: Too Many Requests</code></p>
+<p><strong>Solutions:</strong>
+1. Use HF_TOKEN for authenticated access (higher rate limits)
+2. Cache models locally:
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">HF_HOME</span><span class="o">=</span>/persistent/cache
+</code></pre></div>
+3. Add retry logic or wait before retrying</p>
+<h3 id="slow-analysis">Slow Analysis</h3>
+<p><strong>Symptom:</strong> Diagnostics taking hours</p>
+<p><strong>Quick fixes:</strong>
+1. Use GPU instead of CPU: Check <code>nvidia-smi</code>
+2. Reduce dataset size: <code>--max-samples 100</code>
+3. Skip slow modules: <code>--modules weight_diff behaviour</code>
+4. Check disk I/O: Use SSD, avoid network mounts</p>
+<p><strong>Profiling:</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># Enable verbose logging to identify bottlenecks</span>
+afterburn<span class="w"> </span>--verbose<span class="w"> </span>diagnose<span class="w"> </span>--base<span class="w"> </span>base<span class="w"> </span>--trained<span class="w"> </span>trained<span class="w"> </span>-o<span class="w"> </span>report.html
+</code></pre></div></p>
+<h3 id="permission-denied-docker">Permission Denied (Docker)</h3>
+<p><strong>Symptom:</strong> <code>PermissionError: [Errno 13] Permission denied</code></p>
+<p><strong>Solution:</strong> Fix volume permissions:
+<div class="highlight"><pre><span></span><code><span class="c1"># In docker-compose.yml, match user ID</span>
+user:<span class="w"> </span><span class="s2">&quot;1000:1000&quot;</span>
+
+<span class="c1"># Or fix ownership</span>
+docker-compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>afterburn<span class="w"> </span>chown<span class="w"> </span>-R<span class="w"> </span><span class="m">1000</span>:1000<span class="w"> </span>/app/reports
+</code></pre></div></p>
+<h3 id="missing-dependencies">Missing Dependencies</h3>
+<p><strong>Symptom:</strong> <code>ModuleNotFoundError: No module named 'sentence_transformers'</code></p>
+<p><strong>Solution:</strong> Install optional dependencies:
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>afterburn<span class="o">[</span>semantic<span class="o">]</span><span class="w">  </span><span class="c1"># For semantic analysis</span>
+pip<span class="w"> </span>install<span class="w"> </span>afterburn<span class="o">[</span>pdf<span class="o">]</span><span class="w">       </span><span class="c1"># For PDF reports</span>
+pip<span class="w"> </span>install<span class="w"> </span>afterburn<span class="o">[</span>nli<span class="o">]</span><span class="w">       </span><span class="c1"># For NLI analysis</span>
+</code></pre></div></p>
+<h3 id="cuda-version-mismatch">CUDA Version Mismatch</h3>
+<p><strong>Symptom:</strong> <code>CUDA driver version is insufficient</code></p>
+<p><strong>Solution:</strong>
+1. Check CUDA version: <code>nvidia-smi</code>
+2. Install matching PyTorch:
+<div class="highlight"><pre><span></span><code><span class="c1"># For CUDA 11.8</span>
+pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu118
+
+<span class="c1"># For CUDA 12.1</span>
+pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu121
+</code></pre></div></p>
+<h3 id="report-generation-fails">Report Generation Fails</h3>
+<p><strong>Symptom:</strong> Analysis completes but no report generated</p>
+<p><strong>Debug:</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># Check write permissions</span>
+ls<span class="w"> </span>-la<span class="w"> </span>report.html
+
+<span class="c1"># Use absolute path</span>
+afterburn<span class="w"> </span>diagnose<span class="w"> </span>--base<span class="w"> </span>base<span class="w"> </span>--trained<span class="w"> </span>trained<span class="w"> </span>-o<span class="w"> </span>/tmp/report.html
+
+<span class="c1"># Check logs for errors</span>
+afterburn<span class="w"> </span>--verbose<span class="w"> </span>diagnose<span class="w"> </span>--base<span class="w"> </span>base<span class="w"> </span>--trained<span class="w"> </span>trained<span class="w"> </span>-o<span class="w"> </span>report.html
+</code></pre></div></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "content.code.copy", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
