@@ -36,16 +36,37 @@ That's it. No API keys. Runs locally on CUDA, Apple Silicon (MPS), or CPU.
 
 ```bash
 afterburn hack-check \
+  --base Qwen/Qwen2.5-0.5B \
+  --trained Qwen/Qwen2.5-0.5B-Instruct \
+  --method sft --fast
+```
+
+### Real output (Qwen 2.5-0.5B vs Instruct, CPU, 5 minutes with `--fast`):
+
+```
+Afterburn — Post-training diagnostics for LLMs
+
+  Reward Hacking Risk: LOW (19/100)
+
+  Score Breakdown:
+    Length Bias:         1.5/100  ✓
+    Format Gaming:      53.0/100  ✓
+    Strategy Collapse:  15.4/100  ✓
+    Sycophancy:         0.0/100  ✓
+```
+
+Qwen's SFT is clean — low risk across the board. Format gaming at 53 flags some `\boxed{}` usage increase but nothing alarming. This is what a healthy fine-tune looks like.
+
+Now compare with a model that has issues:
+
+```bash
+afterburn hack-check \
   --base meta-llama/Llama-3.1-8B \
   --trained my-org/Llama-RLVR \
   --method rlvr
 ```
 
-### Output:
-
 ```
-Afterburn — Post-training diagnostics for LLMs
-
   Reward Hacking Risk: HIGH (68/100)
 
   Score Breakdown:
@@ -59,7 +80,11 @@ Afterburn — Post-training diagnostics for LLMs
     ⚠ Strategy collapse: entropy dropped from 1.84 to 0.95 bits
 ```
 
-### Need it faster? Use `--fast` mode (~16x speedup):
+The difference is immediate. Afterburn tells you exactly what went wrong and why.
+
+### `--fast` mode (~16x speedup):
+
+Uses 2 prompt suites instead of 4 and shorter generation (128 tokens instead of 512). Perfect for quick checks and CI/CD:
 
 ```bash
 afterburn hack-check --base <model> --trained <model> --method sft --fast
@@ -75,7 +100,7 @@ afterburn diagnose \
   -o report.html
 ```
 
-This generates an interactive report with Plotly charts: risk gauges, weight diff heatmaps, strategy shift charts, and more.
+Generates an interactive report with Plotly charts: risk gauges, weight diff heatmaps, strategy shift charts, and more.
 
 ---
 

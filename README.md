@@ -17,12 +17,26 @@ You fine-tuned a model. Benchmarks look good. But did RLHF quietly teach it to w
 ```bash
 pip install afterburn
 
-afterburn hack-check --base meta-llama/Llama-3.1-8B --trained my-org/Llama-RLVR --method rlvr
+afterburn hack-check --base Qwen/Qwen2.5-0.5B --trained Qwen/Qwen2.5-0.5B-Instruct --method sft --fast
 ```
+
+**Real output** (Qwen 2.5-0.5B vs Instruct, CPU, 5 minutes with `--fast`):
 
 ```
 Afterburn — Post-training diagnostics for LLMs
 
+  Reward Hacking Risk: LOW (19/100)
+
+  Score Breakdown:
+    Length Bias:         1.5/100  ✓
+    Format Gaming:      53.0/100  ✓
+    Strategy Collapse:  15.4/100  ✓
+    Sycophancy:         0.0/100  ✓
+```
+
+Qwen's SFT is clean. Now compare with a model that has reward hacking issues:
+
+```
   Reward Hacking Risk: HIGH (68/100)
 
   Score Breakdown:
@@ -35,9 +49,6 @@ Afterburn — Post-training diagnostics for LLMs
     ⚠ Length bias: trained model outputs 23% longer (Cohen's d=0.78, p<0.001)
     ⚠ Strategy collapse: entropy dropped from 1.84 to 0.95 bits
 ```
-
-<!-- TODO: Add screenshot of HTML report here -->
-<!-- ![Afterburn HTML Report](docs/assets/report-screenshot.png) -->
 
 ---
 
