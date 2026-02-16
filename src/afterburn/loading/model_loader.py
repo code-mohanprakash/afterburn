@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 import torch
+import transformers
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -12,6 +13,9 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizer,
 )
+
+# Suppress noisy transformers warnings during model loading
+transformers.logging.set_verbosity_error()
 
 from afterburn.device import DeviceConfig, estimate_model_memory_gb, register_cleanup
 from afterburn.exceptions import IncompatibleModelsError, ModelLoadError, ModelNotFoundError
@@ -46,16 +50,43 @@ class ModelLoader:
                 ) from e
             raise ModelLoadError(f"Failed to load config for '{model_id}': {e}") from e
 
-    def load_tokenizer(self, model_id: str) -> PreTrainedTokenizer:
-        """Load tokenizer for a model."""
+    def load_tokenizer(
+        self, model_id: str, fallback_model_id: str | None = None
+    ) -> PreTrainedTokenizer:
+        """Load tokenizer for a model.
+
+        Args:
+            model_id: Primary model to load tokenizer from.
+            fallback_model_id: If set, fall back to this model's tokenizer
+                when the primary model doesn't ship one (common for fine-tunes).
+        """
         try:
             tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=False)  # type: ignore[no-untyped-call]
-            if tokenizer.pad_token is None:
-                tokenizer.pad_token = tokenizer.eos_token
-            tok: PreTrainedTokenizer = tokenizer
-            return tok
         except Exception as e:
-            raise ModelLoadError(f"Failed to load tokenizer for '{model_id}': {e}") from e
+            if fallback_model_id:
+                logger.warning(
+                    "Tokenizer not found for '%s', falling back to '%s'",
+                    model_id,
+                    fallback_model_id,
+                )
+                try:
+                    tokenizer = AutoTokenizer.from_pretrained(
+                        fallback_model_id, trust_remote_code=False
+                    )  # type: ignore[no-untyped-call]
+                except Exception as e2:
+                    raise ModelLoadError(
+                        f"Failed to load tokenizer for '{model_id}' "
+                        f"and fallback '{fallback_model_id}': {e2}"
+                    ) from e2
+            else:
+                raise ModelLoadError(
+                    f"Failed to load tokenizer for '{model_id}': {e}"
+                ) from e
+
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        tok: PreTrainedTokenizer = tokenizer
+        return tok
 
     def load_model(self, model_id: str) -> PreTrainedModel:
         """Load a full model for inference."""

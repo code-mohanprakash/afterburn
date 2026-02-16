@@ -36,6 +36,12 @@ from afterburn.exceptions import AfterburnError
     help="Compute device",
 )
 @click.option("-o", "--output", default=None, help="Output file path")
+@click.option(
+    "--fast",
+    is_flag=True,
+    default=False,
+    help="Fast mode: 2 suites + 128 tokens (~16x faster)",
+)
 def hack_check(
     base: str,
     trained: str,
@@ -43,6 +49,7 @@ def hack_check(
     suites: tuple[str, ...],
     device: str,
     output: str,
+    fast: bool,
 ) -> None:
     """Check for reward hacking patterns in a trained model."""
     from afterburn.diagnoser import Diagnoser
@@ -57,6 +64,7 @@ def hack_check(
             suites=list(suites) if suites else None,
             modules=["behaviour", "reward_hack"],
             device=device,
+            fast=fast,
         )
 
         with create_progress() as progress:

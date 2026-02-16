@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import logging
 import time
+import warnings
 from collections.abc import Callable
 
 import torch
+import transformers
 from transformers import PreTrainedModel, PreTrainedTokenizer
+
+# Suppress noisy transformers warnings during generation
+transformers.logging.set_verbosity_error()
+warnings.filterwarnings("ignore", message=".*right-padding was detected.*")
+warnings.filterwarnings("ignore", message=".*generation flags are not valid.*")
 
 from afterburn.device import DeviceConfig
 from afterburn.types import Prompt, PromptResult

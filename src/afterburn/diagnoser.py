@@ -100,6 +100,7 @@ class Diagnoser:
         device: str | None = None,
         modules: list[str] | None = None,
         collect_logits: bool = False,
+        fast: bool = False,
     ):
         # Validate model IDs for safety
         _validate_model_id(base_model)
@@ -119,6 +120,12 @@ class Diagnoser:
 
         # Load config
         self._config = load_config(config_path)
+
+        # Fast mode: fewer suites, shorter outputs (~16x faster)
+        if fast:
+            self._config.behaviour.suites = ["math", "safety"]
+            self._config.behaviour.max_new_tokens = 128
+            logger.info("Fast mode: 2 suites, 128 max tokens")
 
         # Setup device
         if device:

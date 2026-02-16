@@ -54,6 +54,12 @@ from afterburn.types import ReportFormat
     help="Compute device (auto-detected if not set)",
 )
 @click.option("--config", type=click.Path(exists=True), default=None, help="Config file path")
+@click.option(
+    "--fast",
+    is_flag=True,
+    default=False,
+    help="Fast mode: 2 suites + 128 tokens (~16x faster)",
+)
 def diagnose(
     base: str,
     trained: str,
@@ -64,6 +70,7 @@ def diagnose(
     modules: tuple[str, ...],
     device: str,
     config: str,
+    fast: bool,
 ) -> None:
     """Run full diagnostic analysis on a base/trained model pair."""
     from afterburn.diagnoser import Diagnoser
@@ -84,6 +91,7 @@ def diagnose(
             modules=list(modules) if modules else None,
             device=device,
             config_path=config,
+            fast=fast,
         )
 
         with create_progress() as progress:

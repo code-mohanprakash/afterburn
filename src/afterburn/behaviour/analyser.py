@@ -96,7 +96,10 @@ class BehaviourAnalyser:
             self._progress("Loading trained model", 1, 4)
 
         trained_model = loader.load_model(self.model_pair.trained_model)
-        tokenizer = loader.load_tokenizer(self.model_pair.trained_model)
+        tokenizer = loader.load_tokenizer(
+            self.model_pair.trained_model,
+            fallback_model_id=self.model_pair.base_model,
+        )
         runner = PromptRunner(
             trained_model,
             tokenizer,

@@ -123,7 +123,7 @@ def detect_format_gaming(
     # Overall score: weighted by most concerning pattern
     # Use the max pattern score as the base, with a boost if multiple patterns are flagged
     flagged_count = sum(1 for p in patterns_analysis.values() if p["score"] > 30)
-    multi_pattern_boost = min(flagged_count * 5, 20)
+    multi_pattern_boost = min(flagged_count * 3, 15)
     overall_score = min(max_score + multi_pattern_boost, 100.0)
 
     if flags:
@@ -351,14 +351,14 @@ def _compute_pattern_score(
     if trained_rate < 0.05:
         return 0.0  # Too rare to be meaningful
 
-    # Base score from increase ratio
+    # Base score from increase ratio (gentler sigmoid curve)
     raw_signal = increase_ratio / threshold
-    base_score = 100.0 / (1.0 + math.exp(-3.0 * (raw_signal - 1.0)))
+    base_score = 100.0 / (1.0 + math.exp(-2.0 * (raw_signal - 1.0)))
 
     # Boost from gaming signal (format used even when wrong or partially correct)
-    gaming_boost = gaming_signal * 30.0
+    gaming_boost = gaming_signal * 20.0
 
     # Boost from consistency signal (inconsistent usage across categories)
-    consistency_boost = consistency_signal * 20.0
+    consistency_boost = consistency_signal * 15.0
 
     return min(base_score + gaming_boost + consistency_boost, 100.0)
