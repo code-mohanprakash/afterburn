@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "afterburn"
-version = "0.6.1"
+version = "0.6.2"
 description = "Post-training diagnostics for LLMs — what did fine-tuning actually do to your model?"
-readme = "README.md"
+readme = "PYPI_README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
