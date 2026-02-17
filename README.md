@@ -388,14 +388,50 @@ mypy src/afterburn/                 # type checking (zero errors)
 
 ## Contributing
 
+Afterburn is built for the post-training community — researchers, engineers, and practitioners working on RLHF, DPO, SFT, and alignment. Contributions are welcome at every level.
+
+### Getting Started
+
 ```bash
 git clone https://github.com/code-mohanprakash/afterburn.git
 cd afterburn
 pip install -e ".[dev]"
-pytest tests/
+pytest tests/  # 719 tests, all should pass
 ```
 
-See [docs/contributing.md](docs/contributing.md) for architecture details.
+### Ways to Contribute
+
+**Add new detectors or metrics**
+The most impactful contributions. If you've observed a reward hacking pattern not covered by the four existing detectors, open an issue describing the failure mode and the signal you'd use to detect it. Good targets:
+- KL divergence from reference policy (useful for RLHF auditing)
+- Refusal rate shifts (safety-relevant behavioral change)
+- Verbosity without information gain (distinct from length bias)
+- Positional bias in reasoning chains
+
+**Improve sycophancy probes**
+The 40 adversarial probes in `src/afterburn/prompts/` are a starting point. Community-contributed probes covering more domains (law, medicine, culture) and more subtle forms of agreement-seeking are highly valuable. Add them as YAML to `src/afterburn/prompts/builtin/`.
+
+**Share Afterburn reports for public models**
+If you run Afterburn on a publicly released fine-tune, share the results — as a GitHub issue, a HuggingFace model card section, or a link to the HTML report. This builds a community benchmark of what healthy vs. problematic post-training looks like across architectures and methods.
+
+**Write prompt suites for your domain**
+The prompt suite system supports custom YAML. If you work in a specific domain (code generation, math reasoning, biomedical), contribute a domain-specific suite so Afterburn can catch behavioral shifts that general prompts miss.
+
+**Calibration improvements**
+The sigmoid mappings that convert raw statistical signals to 0–100 scores are tuned on a limited set of models. If you find a detector systematically over- or under-firing on a class of models (e.g., MoE architectures, very small models), open an issue with your data.
+
+### Contribution Guidelines
+
+- Run `pytest tests/` and `ruff check src/ tests/` before submitting a PR
+- New detectors should follow the pattern in `src/afterburn/reward_hack/` — a dataclass result in `types.py`, a detector class, and a scorer
+- Statistical claims need proper effect sizes and p-values — no bare ratio comparisons
+- See [docs/contributing.md](docs/contributing.md) for architecture details
+
+### Community
+
+- **Issues** — bug reports, detector ideas, calibration feedback
+- **Discussions** — share Afterburn reports, compare methods, discuss post-training failure modes
+- **HuggingFace** — tag your model card with `afterburn` if you include a diagnostic report
 
 ---
 
