@@ -446,6 +446,33 @@ Existing tools don't catch this:
 
 Afterburn is the first open-source tool that connects all three layers — weights, behavior, and reward hacking — in a single diagnostic.
 
+## Rule-Based Continuation
+
+Afterburn supports rule-based diagnostic continuation, allowing you to define custom analysis workflows. Once you've identified a reward hacking pattern, you can:
+
+- **Chain detectors** — run additional probes automatically based on initial findings
+- **Custom thresholds** — define domain-specific rules for risk escalation  
+- **Automated remediation** — flag models for retraining when specific conditions are met
+- **Reporting hooks** — integrate Afterburn diagnostics into your CI/CD pipelines with conditional logic
+
+Example workflow:
+```python
+from afterburn import Diagnoser
+
+report = Diagnoser(base_model="...", trained_model="...").run()
+
+if report.hack_score > 50:
+    # Automatically run deeper analysis
+    extended_report = Diagnoser(
+        base_model="...",
+        trained_model="...",
+        run_extended_probes=True
+    ).run()
+    # Reject deployment via CI/CD
+```
+
+See [docs/guide/deployment.md](docs/guide/deployment.md) for production rule-based workflows.
+
 ## License
 
 MIT
